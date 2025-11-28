@@ -139,7 +139,11 @@ const CONFIG = {
     return `https://generativelanguage.googleapis.com/v1beta/models/${this.GEMINI_MODEL}:generateContent`;
   },
   get GEMINI_MAX_TOKENS() {
-    return parseInt(process.env.GEMINI_MAX_TOKENS, 10) || 256;
+    const parsed = parseInt(process.env.GEMINI_MAX_TOKENS, 10);
+    // Geçerli aralık: 1-8192 (Gemini API limiti)
+    if (isNaN(parsed) || parsed < 1) return 256;
+    if (parsed > 8192) return 8192;
+    return parsed;
   },
   GEMINI_PROMPT: `Read the CAPTCHA text. Reply with ONLY the characters (letters and numbers), nothing else. The CAPTCHA is usually 6 characters.`,
 
