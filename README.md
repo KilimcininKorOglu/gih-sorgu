@@ -8,7 +8,7 @@ Google Gemini API kullanarak CAPTCHA'yı otomatik çözer. Sıfır bağımlılı
 
 ```bash
 # Repoyu klonla
-git clone https://github.com/user/gih-sorgu.git
+git clone https://github.com/KilimcininKorOglu/gih-sorgu.git
 cd gih-sorgu
 
 # .env dosyasını oluştur
@@ -38,8 +38,9 @@ node gih-sorgu.js --liste sites.txt
 # JSON formatında çıktı
 node gih-sorgu.js --json discord.com
 
-# Yardım
+# Yardım ve versiyon
 node gih-sorgu.js --help
+node gih-sorgu.js --version
 ```
 
 ## 📋 Örnek Çıktı
