@@ -366,6 +366,7 @@ function httpsGet(url, options = {}, redirectCount = 0) {
       const chunks = [];
 
       res.on('data', chunk => chunks.push(chunk));
+      res.on('error', reject); // Response stream hata handler'ı
       res.on('end', async () => {
         try {
           const rawData = Buffer.concat(chunks);
@@ -422,6 +423,7 @@ function httpsPost(url, body, options = {}) {
       const chunks = [];
 
       res.on('data', chunk => chunks.push(chunk));
+      res.on('error', reject); // Response stream hata handler'ı
       res.on('end', async () => {
         try {
           const rawData = Buffer.concat(chunks);
@@ -473,6 +475,7 @@ function httpsPostJSON(url, jsonBody, options = {}) {
       const chunks = [];
 
       res.on('data', chunk => chunks.push(chunk));
+      res.on('error', reject); // Response stream hata handler'ı
       res.on('end', () => {
         const responseData = Buffer.concat(chunks).toString('utf-8');
         resolve({
