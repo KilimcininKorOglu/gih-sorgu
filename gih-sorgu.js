@@ -24,16 +24,11 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 
-// SSL sertifika doğrulamasını devre dışı bırak (guvenlinet.org.tr sertifika zinciri sorunu için)
-// Uyarıyı bastır - bu bilinçli bir tercih
-const originalEmitWarning = process.emitWarning;
-process.emitWarning = (warning, ...args) => {
-  if (typeof warning === 'string' && warning.includes('NODE_TLS_REJECT_UNAUTHORIZED')) {
-    return; // Bu spesifik uyarıyı bastır
-  }
-  return originalEmitWarning.call(process, warning, ...args);
-};
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+// SSL sertifika doğrulamasını SADECE guvenlinet.org.tr için devre dışı bırakan agent
+// Bu sayede Gemini API gibi diğer istekler güvenli kalır
+const insecureAgent = new https.Agent({
+  rejectUnauthorized: false
+});
 
 // ============================================================================
 // .ENV DOSYASI YÜKLEME (Zero-dependency)
@@ -327,6 +322,11 @@ function httpsGet(url, options = {}, redirectCount = 0) {
       headers: headers,
     };
 
+    // Sadece guvenlinet.org.tr için SSL doğrulamasını devre dışı bırak
+    if (urlObj.hostname.includes('guvenlinet.org.tr')) {
+      reqOptions.agent = insecureAgent;
+    }
+
     const req = https.request(reqOptions, (res) => {
       // Redirect handling (301, 302, 303, 307, 308)
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
@@ -386,6 +386,11 @@ function httpsPost(url, body, options = {}) {
         ...options.headers,
       },
     };
+
+    // Sadece guvenlinet.org.tr için SSL doğrulamasını devre dışı bırak
+    if (urlObj.hostname.includes('guvenlinet.org.tr')) {
+      reqOptions.agent = insecureAgent;
+    }
 
     const req = https.request(reqOptions, (res) => {
       const chunks = [];
