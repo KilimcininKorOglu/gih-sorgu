@@ -90,6 +90,16 @@ loadEnvFile();
 // Versiyon
 const VERSION = '1.0.0';
 
+// Exit kodları (semantic exit codes)
+const EXIT_CODES = {
+  SUCCESS: 0,           // Başarılı
+  GENERAL_ERROR: 1,     // Genel hata
+  INVALID_ARGS: 2,      // Geçersiz argümanlar
+  CONFIG_ERROR: 3,      // Yapılandırma hatası (API key eksik vb.)
+  NETWORK_ERROR: 4,     // Ağ hatası
+  API_ERROR: 5,         // API hatası (Gemini)
+};
+
 // Global JSON output flag (argümanlardan ayarlanır)
 let JSON_OUTPUT = false;
 
@@ -877,13 +887,13 @@ async function main() {
   // Versiyon kontrolü
   if (args.includes('--version') || args.includes('-v')) {
     console.log(`Güvenli İnternet Sorgu Aracı v${VERSION}`);
-    process.exit(0);
+    process.exit(EXIT_CODES.SUCCESS);
   }
 
   // Yardım kontrolü
   if (args.includes('--help') || args.includes('-h') || args.length === 0) {
     showHelp();
-    process.exit(args.length === 0 ? 1 : 0);
+    process.exit(args.length === 0 ? EXIT_CODES.INVALID_ARGS : EXIT_CODES.SUCCESS);
   }
 
   let domains = [];
@@ -911,7 +921,7 @@ async function main() {
         } else {
           console.error(`❌ Dosya bulunamadı: ${listFile}`);
         }
-        process.exit(1);
+        process.exit(EXIT_CODES.INVALID_ARGS);
       }
       const content = fs.readFileSync(listFile, 'utf-8');
       domains = content.split('\n')
@@ -932,7 +942,7 @@ async function main() {
       console.error('❌ Sorgulanacak domain belirtilmedi!');
       console.log('   Kullanım: node gih-sorgu.js <domain>');
     }
-    process.exit(1);
+    process.exit(EXIT_CODES.INVALID_ARGS);
   }
 
   // Domain validasyonu
@@ -950,7 +960,7 @@ async function main() {
       } else {
         console.error('❌ Geçerli domain bulunamadı!');
       }
-      process.exit(1);
+      process.exit(EXIT_CODES.INVALID_ARGS);
     }
   }
 
@@ -971,7 +981,7 @@ async function main() {
       console.log('');
       console.log('   API anahtarı almak için: https://aistudio.google.com/app/apikey');
     }
-    process.exit(1);
+    process.exit(EXIT_CODES.CONFIG_ERROR);
   }
 
   log(`📋 Sorgulanacak ${domains.length} site: ${domains.join(', ')}`);
@@ -1130,7 +1140,13 @@ async function main() {
     } else {
       console.error(`\n❌ Hata: ${error.message}`);
     }
-    process.exit(1);
+    // Hata türüne göre exit kodu belirle
+    const exitCode = error.message.includes('API') 
+      ? EXIT_CODES.API_ERROR 
+      : error.message.includes('zaman aşımı') || error.message.includes('HTTP')
+        ? EXIT_CODES.NETWORK_ERROR 
+        : EXIT_CODES.GENERAL_ERROR;
+    process.exit(exitCode);
   }
 }
 
@@ -1141,5 +1157,5 @@ main().catch(error => {
   } else {
     console.error(`\n❌ Beklenmeyen hata: ${error.message}`);
   }
-  process.exit(1);
+  process.exit(EXIT_CODES.GENERAL_ERROR);
 });
