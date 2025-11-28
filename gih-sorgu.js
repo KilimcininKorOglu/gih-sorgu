@@ -163,6 +163,15 @@ const CONFIG = {
 
   // HTTP timeout (ms)
   REQUEST_TIMEOUT: 30000,
+
+  // Rate limiting (ms) - çoklu sorgu arasındaki bekleme süresi
+  get RATE_LIMIT_DELAY() {
+    const parsed = parseInt(process.env.RATE_LIMIT_DELAY, 10);
+    // Geçerli aralık: 0-10000ms
+    if (isNaN(parsed) || parsed < 0) return 500;
+    if (parsed > 10000) return 10000;
+    return parsed;
+  },
 };
 
 // ============================================================================
@@ -1112,8 +1121,8 @@ async function main() {
       }
 
       // Rate limiting
-      if (i < domains.length - 1) {
-        await sleep(500);
+      if (i < domains.length - 1 && CONFIG.RATE_LIMIT_DELAY > 0) {
+        await sleep(CONFIG.RATE_LIMIT_DELAY);
       }
     }
 
