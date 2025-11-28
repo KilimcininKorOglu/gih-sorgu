@@ -188,12 +188,35 @@ function cookiesToString(cookies) {
 
 /**
  * Domain adının geçerli olup olmadığını kontrol eder
+ * ASCII domainler ve punycode (xn--) IDN domainleri destekler
  */
 function isValidDomain(domain) {
   if (!domain || typeof domain !== 'string') return false;
-  // Basit domain regex: en az bir nokta, geçerli karakterler
-  const domainRegex = /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
-  return domainRegex.test(domain);
+  
+  // Trim ve lowercase
+  const d = domain.trim().toLowerCase();
+  if (d.length === 0 || d.length > 253) return false;
+  
+  // En az bir nokta olmalı
+  if (!d.includes('.')) return false;
+  
+  // Her label'ı kontrol et
+  const labels = d.split('.');
+  for (const label of labels) {
+    // Label boş olamaz, 63 karakterden uzun olamaz
+    if (label.length === 0 || label.length > 63) return false;
+    // Başta veya sonda tire olamaz
+    if (label.startsWith('-') || label.endsWith('-')) return false;
+    // Punycode (xn--) veya ASCII alfanumerik ve tire içermeli
+    if (!/^[a-z0-9-]+$/.test(label)) return false;
+  }
+  
+  // TLD en az 2 karakter ve sadece harf (punycode hariç)
+  const tld = labels[labels.length - 1];
+  if (tld.length < 2) return false;
+  if (!tld.startsWith('xn--') && !/^[a-z]+$/.test(tld)) return false;
+  
+  return true;
 }
 
 /**
