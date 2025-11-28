@@ -516,8 +516,15 @@ async function solveCaptchaWithGemini(imageBuffer, apiKey) {
     });
 
     if (response.statusCode !== 200) {
-      const errorData = JSON.parse(response.data);
-      const errorMsg = errorData.error?.message || `HTTP ${response.statusCode}`;
+      let errorMsg = `HTTP ${response.statusCode}`;
+      try {
+        const errorData = JSON.parse(response.data);
+        errorMsg = errorData.error?.message || errorMsg;
+      } catch {
+        // JSON parse hatası - yanıt muhtemelen HTML veya düz metin
+        const preview = response.data.substring(0, 100);
+        errorMsg = `${errorMsg} - ${preview}`;
+      }
 
       // Spesifik hata mesajları
       if (response.statusCode === 429) {
