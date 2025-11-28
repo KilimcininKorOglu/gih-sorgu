@@ -130,7 +130,6 @@ const CONFIG = {
     'Sec-Fetch-Mode': 'cors',
     'Sec-Fetch-Site': 'same-origin',
   },
-  CAPTCHA_FILE: 'captcha.jpg',
 
   // Gemini API Ayarları (.env dosyasından veya varsayılan)
   get GEMINI_MODEL() {
@@ -650,16 +649,12 @@ async function getCaptcha(existingSession = null) {
     throw new Error(`Geçersiz CAPTCHA yanıtı: ${preview.substring(0, 50)}...`);
   }
 
-  // CAPTCHA resmini kaydet
-  const captchaPath = path.join(process.cwd(), CONFIG.CAPTCHA_FILE);
-  fs.writeFileSync(captchaPath, response.data);
+  log(`✅ CAPTCHA indirildi: ${response.data.length} bytes`);
 
-  log(`✅ CAPTCHA kaydedildi: ${captchaPath} (${response.data.length} bytes)`);
-
+  // In-memory buffer kullan, dosyaya kaydetme (race condition önlenir)
   return {
     cookies,
-    imageBuffer: response.data,
-    captchaPath
+    imageBuffer: response.data
   };
 }
 
@@ -1106,19 +1101,6 @@ async function main() {
       console.error(`\n❌ Hata: ${error.message}`);
     }
     process.exit(1);
-  } finally {
-    // CAPTCHA dosyasını her durumda temizle
-    const captchaPath = path.join(process.cwd(), CONFIG.CAPTCHA_FILE);
-    if (fs.existsSync(captchaPath)) {
-      try {
-        fs.unlinkSync(captchaPath);
-        if (!jsonOutput) {
-          log('\n🧹 CAPTCHA dosyası temizlendi.');
-        }
-      } catch (e) {
-        // Temizleme hatası kritik değil, sessizce devam et
-      }
-    }
   }
 }
 
