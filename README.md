@@ -1,67 +1,101 @@
 # GİH Sorgu
 
-Türkiye'deki **Güvenli İnternet Hizmeti (GİH)** üzerinden domain engellenme durumunu sorgulayan Node.js CLI aracı.
+Türkiye'deki **Güvenli İnternet Hizmeti (GİH)** üzerinden domain engellenme durumunu sorgulayan Go CLI aracı.
 
-Google Gemini API kullanarak CAPTCHA'yı otomatik çözer. Sıfır bağımlılık, tek dosya.
+Google Gemini API kullanarak CAPTCHA'yı otomatik çözer. Tek dosya, cross-platform binary (~7MB).
 
-## 🚀 Kurulum
+## Kurulum
+
+### Hazır Binary (Önerilen)
+
+[Releases](https://github.com/KilimcininKorOglu/gih-sorgu/releases) sayfasından platformunuza uygun binary'yi indirin:
+
+| Platform | Mimari | Dosya |
+|----------|--------|-------|
+| Windows | x64 | `gih-sorgu-windows-amd64.exe` |
+| Windows | ARM64 | `gih-sorgu-windows-arm64.exe` |
+| Linux | x64 | `gih-sorgu-linux-amd64` |
+| Linux | ARM64 | `gih-sorgu-linux-arm64` |
+| macOS | Intel | `gih-sorgu-darwin-amd64` |
+| macOS | Apple Silicon | `gih-sorgu-darwin-arm64` |
+
+### Kaynak Koddan Derleme
 
 ```bash
 # Repoyu klonla
 git clone https://github.com/KilimcininKorOglu/gih-sorgu.git
 cd gih-sorgu
 
-# .env dosyasını oluştur
-cp .env.example .env
+# Derle
+go build -ldflags="-s -w" -o gih-sorgu .
 
-# API anahtarını ekle
-# .env dosyasında GEMINI_API_KEY değerini ayarla
+# veya tüm platformlar için
+./build.sh        # Linux/macOS
+build.bat         # Windows
 ```
 
 ### Gereksinimler
 
-- **Node.js** v18+
 - **Gemini API Key** - [Google AI Studio](https://aistudio.google.com/app/apikey) adresinden ücretsiz alınabilir
 
-## 📖 Kullanım
+## Yapılandırma
+
+`.env` dosyasını executable ile aynı dizine oluşturun:
+
+```env
+GEMINI_API_KEY=your_api_key_here
+```
+
+| Değişken | Zorunlu | Varsayılan | Açıklama |
+|----------|---------|------------|----------|
+| `GEMINI_API_KEY` | Evet | - | Google Gemini API anahtarı |
+| `GEMINI_MODEL` | - | `gemini-2.5-flash` | Kullanılacak Gemini modeli |
+| `GEMINI_MAX_TOKENS` | - | `256` | Maksimum çıktı token sayısı (1-8192) |
+| `USER_AGENT` | - | Firefox UA | HTTP isteklerinde User-Agent |
+| `RATE_LIMIT_DELAY` | - | `500` | Sorgular arası bekleme (ms, 0-10000) |
+
+## Kullanım
+
+### İnteraktif TUI Modu
+
+Argümansız çalıştırınca interaktif TUI açılır (Windows'ta exe'ye çift tıklayın):
+
+```bash
+./gih-sorgu
+```
+
+**TUI Kontrolleri:**
+- `Enter` - Domain sorgula
+- `1-9` - Geçmişten seç ve sorgula
+- `↑/↓` - Geçmişte gezin
+- `Tab` - Son sorguyu kopyala
+- `Esc` - Çıkış
+
+### CLI Modu
 
 ```bash
 # Tek domain sorgula
-node gih-sorgu.js discord.com
+./gih-sorgu discord.com
 
 # Birden fazla domain
-node gih-sorgu.js discord.com twitter.com google.com
+./gih-sorgu discord.com twitter.com google.com
 
 # Dosyadan liste oku
-node gih-sorgu.js --liste sites.txt
+./gih-sorgu --liste sites.txt
 
 # JSON formatında çıktı
-node gih-sorgu.js --json discord.com
+./gih-sorgu --json discord.com
 
 # Yardım ve versiyon
-node gih-sorgu.js --help
-node gih-sorgu.js --version
+./gih-sorgu --help
+./gih-sorgu --version
 ```
 
-## 📋 Örnek Çıktı
+## Örnek Çıktı
 
-```bash
-╔════════════════════════════════════════════════════════════╗
-║     Güvenli İnternet Hizmeti (GİH) Sorgu Aracı             ║
-╚════════════════════════════════════════════════════════════╝
+### Normal Çıktı
 
-📋 Sorgulanacak 1 site: discord.com
-🤖 Model: gemini-2.5-flash
-
-🔗 Session başlatılıyor...
-✅ Session alındı: 0 cookie
-📥 CAPTCHA indiriliyor...
-✅ CAPTCHA kaydedildi: captcha.jpg (6724 bytes)
-🤖 Gemini API ile CAPTCHA çözülüyor...
-✅ CAPTCHA çözüldü: ft3rn4g
-
-🔍 Sorgulanıyor: discord.com
-
+```
 ════════════════════════════════════════════════════════════
 📌 Domain: discord.com
 ⏱️ Sorgu Süresi: 1.95s
@@ -74,60 +108,58 @@ node gih-sorgu.js --version
 ────────────────────────────────────────────────────────────
 📝 Mesaj: Bu alan adı aile ve çocuk profilinde görüntülenememektedir.
 ════════════════════════════════════════════════════════════
-
-🧹 CAPTCHA dosyası temizlendi.
 ```
 
-## ⚙️ Yapılandırma
-
-`.env` dosyasından veya sistem ortam değişkenlerinden okunur:
-
-| Değişken | Zorunlu | Varsayılan | Açıklama |
-|----------|---------|------------|----------|
-| `GEMINI_API_KEY` | ✅ | - | Google Gemini API anahtarı |
-| `GEMINI_MODEL` | - | `gemini-2.5-flash` | Kullanılacak Gemini modeli |
-| `GEMINI_MAX_TOKENS` | - | `256` | Maksimum çıktı token sayısı |
-| `USER_AGENT` | - | Firefox UA | HTTP isteklerinde User-Agent |
-
-## 🔧 JSON Çıktı
-
-Otomasyon için `--json` flag'i kullanın:
-
-```bash
-node gih-sorgu.js --json discord.com
-```
+### JSON Çıktı (`--json`)
 
 ```json
 {
-  "timestamp": "2024-11-27T18:30:00.000Z",
+  "timestamp": "2024-12-06T12:00:00Z",
   "status": true,
   "queryDuration": 1950,
-  "queryDurationFormatted": "1.95s",
   "domain": "discord.com",
+  "engelliMi": true,
   "aileProfili": "engelli",
   "cocukProfili": "engelli",
-  "engelliMi": true,
   "engelTarihi": "2024-10-20 22:34:15",
   "mesaj": "Bu alan adı aile ve çocuk profilinde görüntülenememektedir."
 }
 ```
 
-## 📁 Dosya Listesi
+## Dosya Listesi Formatı
 
-```bash
-sites.txt          # Her satırda bir domain
-# yorum satırı      # # ile başlayan satırlar atlanır
+```text
+# sites.txt - Her satırda bir domain
+discord.com
+twitter.com
+# Yorum satırları # ile başlar
+google.com
 ```
 
-## 🔒 Güvenlik Notu
+## Exit Kodları
+
+| Kod | Anlam |
+|-----|-------|
+| 0 | Başarılı |
+| 1 | Genel hata |
+| 2 | Geçersiz argüman |
+| 3 | Config hatası (API key eksik) |
+| 4 | Ağ hatası |
+| 5 | API hatası |
+
+## Güvenlik Notu
 
 - SSL sertifika doğrulaması `guvenlinet.org.tr` sertifika zinciri sorunu nedeniyle devre dışı bırakılmıştır
-- API anahtarınızı `.env` dosyasında saklayın, commit etmeyin (`.gitignore`'da tanımlı)
+- API anahtarınızı `.env` dosyasında saklayın, commit etmeyin
 
-## 📜 Lisans
+## Geçmiş
+
+Sorgu geçmişi `history.json` dosyasında saklanır (max 100 kayıt). TUI modunda `1-9` tuşlarıyla geçmişten hızlıca seçim yapabilirsiniz.
+
+## Lisans
 
 MIT
 
-## 🔗 Kaynak
+## Kaynak
 
 Sorgu yapılan site: [guvenlinet.org.tr/sorgula](https://www.guvenlinet.org.tr/sorgula)
