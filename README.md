@@ -1,5 +1,9 @@
 # GİH Sorgu
 
+[![Release](https://img.shields.io/github/v/release/KilimcininKorOglu/gih-sorgu)](https://github.com/KilimcininKorOglu/gih-sorgu/releases)
+[![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go)](https://go.dev/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 Türkiye'deki **Güvenli İnternet Hizmeti (GİH)** üzerinden domain engellenme durumunu sorgulayan Go CLI aracı.
 
 Google Gemini API kullanarak CAPTCHA'yı otomatik çözer. Tek dosya, cross-platform binary (~7MB).
