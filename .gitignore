@@ -1,2 +1,8 @@
 .env
 captcha.png
+captcha.jpg
+
+# Go binaries
+gih-sorgu
+gih-sorgu.exe
+dist/
