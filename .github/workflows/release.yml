@@ -22,7 +22,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.22'
 
       - name: Get dependencies
         run: go mod tidy
@@ -33,14 +33,14 @@ jobs:
           # Get latest tag
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
 
-          # Get current version from main.go
-          CURRENT_VERSION=$(grep -oP 'const Version = "\K[^"]+' main.go)
-          echo "Current version in main.go: $CURRENT_VERSION"
+          # Get short commit hash
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "Short SHA: $SHORT_SHA"
 
           if [ -z "$LATEST_TAG" ]; then
-            # No tags exist - use current version from main.go (first release)
-            echo "No tags found, using version from main.go: $CURRENT_VERSION"
-            NEW_VERSION="$CURRENT_VERSION"
+            # No tags exist - start from 1.0.0
+            echo "No tags found, starting from 1.0.0"
+            NEW_VERSION="1.0.0"
             BUMP_TYPE="initial"
           else
             echo "Latest tag: $LATEST_TAG"
@@ -90,41 +90,56 @@ jobs:
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
+          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
 
       - name: Build for all platforms
         run: |
           mkdir -p dist
           VERSION="${{ steps.version.outputs.version }}"
-          LDFLAGS="-s -w"
+          SHORT_SHA="${{ steps.version.outputs.short_sha }}"
+          BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          LDFLAGS="-s -w -X main.Version=$VERSION -X main.BuildCommit=$SHORT_SHA -X main.BuildTime=$BUILD_TIME"
+
+          echo "Building version $VERSION (commit: $SHORT_SHA, time: $BUILD_TIME)"
 
           # Windows AMD64
+          echo "Building Windows AMD64..."
           GOOS=windows GOARCH=amd64 go build -ldflags="$LDFLAGS" -o dist/gih-sorgu-windows-amd64.exe .
 
           # Windows ARM64
+          echo "Building Windows ARM64..."
           GOOS=windows GOARCH=arm64 go build -ldflags="$LDFLAGS" -o dist/gih-sorgu-windows-arm64.exe .
 
           # Linux AMD64
+          echo "Building Linux AMD64..."
           GOOS=linux GOARCH=amd64 go build -ldflags="$LDFLAGS" -o dist/gih-sorgu-linux-amd64 .
 
           # Linux ARM64
+          echo "Building Linux ARM64..."
           GOOS=linux GOARCH=arm64 go build -ldflags="$LDFLAGS" -o dist/gih-sorgu-linux-arm64 .
 
           # macOS AMD64 (Intel)
+          echo "Building macOS AMD64..."
           GOOS=darwin GOARCH=amd64 go build -ldflags="$LDFLAGS" -o dist/gih-sorgu-darwin-amd64 .
 
           # macOS ARM64 (Apple Silicon)
+          echo "Building macOS ARM64..."
           GOOS=darwin GOARCH=arm64 go build -ldflags="$LDFLAGS" -o dist/gih-sorgu-darwin-arm64 .
+
+          echo "All builds complete!"
+          ls -la dist/
 
       - name: Create checksums
         run: |
           cd dist
           sha256sum * > checksums.txt
+          echo "Checksums:"
           cat checksums.txt
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: gih-sorgu-binaries
+          name: gih-sorgu-binaries-${{ steps.version.outputs.short_sha }}
           path: dist/
           retention-days: 30
 
@@ -142,12 +157,22 @@ jobs:
 
       - name: Create Release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.tag_check.outputs.exists == 'false'
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: GİH Sorgu v${{ steps.version.outputs.version }}
           body: |
             ## Güvenli İnternet Hizmeti Sorgu Aracı v${{ steps.version.outputs.version }}
+
+            **Commit:** `${{ steps.version.outputs.short_sha }}`
+
+            ### Features
+
+            - 🖥️ **Interactive TUI** - Run without arguments for interactive mode
+            - 🔍 **CLI Mode** - Query single or multiple domains from command line
+            - 📜 **History** - Automatic query history with JSON persistence
+            - 🤖 **Auto CAPTCHA** - Gemini AI powered CAPTCHA solving
+            - 📊 **JSON Output** - Machine-readable output format
 
             ### Downloads
 
@@ -163,20 +188,37 @@ jobs:
             ### Usage
 
             ```bash
-            # Single domain
+            # Interactive TUI mode (double-click on Windows)
+            ./gih-sorgu
+
+            # Single domain query
             ./gih-sorgu discord.com
 
             # Multiple domains
-            ./gih-sorgu discord.com twitter.com
+            ./gih-sorgu discord.com twitter.com google.com
 
             # JSON output
             ./gih-sorgu --json discord.com
+
+            # From file
+            ./gih-sorgu --liste sites.txt
             ```
+
+            ### TUI Controls
+
+            - `Enter` - Query domain
+            - `1-9` - Select from history and query
+            - `↑/↓` - Scroll history
+            - `Tab` - Copy last query to input
+            - `Esc` - Exit
 
             ### Requirements
 
-            - Gemini API key from https://aistudio.google.com/app/apikey
-            - Create `.env` file with `GEMINI_API_KEY=your_key`
+            1. Get Gemini API key from https://aistudio.google.com/app/apikey
+            2. Create `.env` file next to the executable:
+               ```
+               GEMINI_API_KEY=your_api_key_here
+               ```
           files: |
             dist/*
           draft: false
