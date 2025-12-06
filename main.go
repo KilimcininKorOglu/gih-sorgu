@@ -1633,7 +1633,7 @@ func main() {
 func run() int {
 	// Load .env file
 	if err := loadEnvFile(); err != nil {
-		fmt.Fprintf(os.Stderr, "⚠️  .env dosyası okunamadı: %s\n", err)
+		fmt.Fprintf(os.Stderr, "⚠️ .env dosyası okunamadı: %s\n", err)
 	}
 
 	// Parse arguments
@@ -1711,7 +1711,7 @@ func run() int {
 			if jsonOutputMode {
 				log("Geçersiz domain atlandı: %s\n", d)
 			} else {
-				fmt.Fprintf(os.Stderr, "⚠️  Geçersiz domain atlandı: %s\n", d)
+				fmt.Fprintf(os.Stderr, "⚠️ Geçersiz domain atlandı: %s\n", d)
 			}
 		}
 	}
@@ -1815,7 +1815,7 @@ func run() int {
 			// Check for CAPTCHA error
 			if isCaptchaError(html) {
 				lastErr = fmt.Errorf("CAPTCHA kodu hatalı")
-				logln("⚠️  CAPTCHA kodu hatalı!")
+				logln("⚠️ CAPTCHA kodu hatalı!")
 				sharedSession = nil
 				if retry < MaxRetries-1 {
 					log("🔄 Yeni CAPTCHA ile deneniyor (%d/%d)...\n", retry+1, MaxRetries)
