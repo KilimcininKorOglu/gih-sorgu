@@ -1,6 +1,7 @@
 .env
 captcha.png
 captcha.jpg
+history.json
 
 # Go binaries
 gih-sorgu

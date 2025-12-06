@@ -34,13 +34,22 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
-const Version = "1.0.0"
+// Build info (set via ldflags at build time)
+var (
+	Version     = "dev"
+	BuildCommit = "local"
+	BuildTime   = "unknown"
+)
 
 // Exit codes
 const (
@@ -194,6 +203,556 @@ var (
 	successMesajRegex = regexp.MustCompile(`<div class="success">([^<]+)</div>`)
 	profileImgRegex   = regexp.MustCompile(`(?s)<td[^>]*id="profile"[^>]*>.*?<img src="([^"]+)"[^>]*>.*?</td>`)
 )
+
+// ============================================================================
+// TUI STYLES
+// ============================================================================
+
+var (
+	// Colors
+	primaryColor   = lipgloss.Color("#FF6B6B")
+	secondaryColor = lipgloss.Color("#4ECDC4")
+	successColor   = lipgloss.Color("#2ECC71")
+	errorColor     = lipgloss.Color("#E74C3C")
+	warningColor   = lipgloss.Color("#F39C12")
+	mutedColor     = lipgloss.Color("#7F8C8D")
+	bgColor        = lipgloss.Color("#1A1A2E")
+
+	// Styles
+	titleStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#FFFFFF")).
+			Background(primaryColor).
+			Padding(0, 2).
+			MarginBottom(1)
+
+	subtitleStyle = lipgloss.NewStyle().
+			Foreground(secondaryColor).
+			MarginBottom(1)
+
+	inputStyle = lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(secondaryColor).
+			Padding(0, 1)
+
+	resultBoxStyle = lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(mutedColor).
+			Padding(1, 2).
+			MarginTop(1)
+
+	blockedStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(errorColor)
+
+	accessibleStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(successColor)
+
+	statusStyle = lipgloss.NewStyle().
+			Foreground(warningColor).
+			Italic(true)
+
+	helpStyle = lipgloss.NewStyle().
+			Foreground(mutedColor).
+			MarginTop(1)
+
+	historyStyle = lipgloss.NewStyle().
+			Foreground(mutedColor).
+			PaddingLeft(2)
+
+	errorMsgStyle = lipgloss.NewStyle().
+			Foreground(errorColor).
+			Bold(true)
+)
+
+// ============================================================================
+// TUI MODEL
+// ============================================================================
+
+// TUIState represents the current state of the TUI
+type TUIState int
+
+const (
+	stateInput TUIState = iota
+	stateQuerying
+	stateResult
+	stateError
+)
+
+// HistoryItem represents a queried domain result
+type HistoryItem struct {
+	Domain       string       `json:"domain"`
+	Result       *QueryResult `json:"result,omitempty"`
+	DurationMs   int64        `json:"durationMs"`
+	Error        string       `json:"error,omitempty"`
+	Timestamp    time.Time    `json:"timestamp"`
+	duration     time.Duration
+}
+
+// HistoryFile represents the history.json structure
+type HistoryFile struct {
+	Version string        `json:"version"`
+	Updated time.Time     `json:"updated"`
+	Items   []HistoryItem `json:"items"`
+}
+
+const historyFileName = "history.json"
+const maxHistoryItems = 100
+
+// loadHistory loads history from history.json
+func loadHistory() []HistoryItem {
+	data, err := os.ReadFile(historyFileName)
+	if err != nil {
+		return []HistoryItem{}
+	}
+
+	var hf HistoryFile
+	if err := json.Unmarshal(data, &hf); err != nil {
+		return []HistoryItem{}
+	}
+
+	// Convert DurationMs back to duration
+	for i := range hf.Items {
+		hf.Items[i].duration = time.Duration(hf.Items[i].DurationMs) * time.Millisecond
+	}
+
+	return hf.Items
+}
+
+// saveHistory saves history to history.json
+func saveHistory(items []HistoryItem) error {
+	// Limit history size
+	if len(items) > maxHistoryItems {
+		items = items[len(items)-maxHistoryItems:]
+	}
+
+	// Convert duration to DurationMs for JSON
+	for i := range items {
+		items[i].DurationMs = items[i].duration.Milliseconds()
+	}
+
+	hf := HistoryFile{
+		Version: Version,
+		Updated: time.Now(),
+		Items:   items,
+	}
+
+	data, err := json.MarshalIndent(hf, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(historyFileName, data, 0644)
+}
+
+// TUIModel is the Bubbletea model for the TUI
+type TUIModel struct {
+	textInput     textinput.Model
+	state         TUIState
+	config        *Config
+	currentQuery  string
+	result        *QueryResult
+	duration      time.Duration
+	errorMsg      string
+	history       []HistoryItem
+	historyOffset int // Scroll offset for history view
+	width         int
+	height        int
+	quitting      bool
+}
+
+// QueryMsg is sent when a query completes
+type QueryMsg struct {
+	Result   *QueryResult
+	Duration time.Duration
+	Error    error
+}
+
+// NewTUIModel creates a new TUI model
+func NewTUIModel(cfg *Config) TUIModel {
+	ti := textinput.New()
+	ti.Placeholder = "örn: discord.com"
+	ti.Focus()
+	ti.CharLimit = 253
+	ti.Width = 40
+	ti.PromptStyle = lipgloss.NewStyle().Foreground(secondaryColor)
+	ti.TextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF"))
+
+	// Load existing history
+	history := loadHistory()
+
+	return TUIModel{
+		textInput:     ti,
+		state:         stateInput,
+		config:        cfg,
+		history:       history,
+		historyOffset: 0,
+		width:         80,
+		height:        24,
+	}
+}
+
+// getVisibleHistoryCount returns how many history items to show
+func (m TUIModel) getVisibleHistoryCount() int {
+	// Calculate available lines for history (screen height - header - input - help - margins)
+	available := m.height - 10
+	if available < 5 {
+		available = 5
+	}
+	if available > 15 {
+		available = 15
+	}
+	if available > len(m.history) {
+		return len(m.history)
+	}
+	return available
+}
+
+// Init implements tea.Model
+func (m TUIModel) Init() tea.Cmd {
+	return textinput.Blink
+}
+
+// Update implements tea.Model
+func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c", "esc":
+			if m.state == stateResult || m.state == stateError {
+				// Go back to input
+				m.state = stateInput
+				m.textInput.SetValue("")
+				m.textInput.Focus()
+				return m, textinput.Blink
+			}
+			m.quitting = true
+			return m, tea.Quit
+
+		case "enter":
+			if m.state == stateInput && m.textInput.Value() != "" {
+				domain := strings.TrimSpace(m.textInput.Value())
+				if isValidDomain(domain) {
+					m.currentQuery = domain
+					m.state = stateQuerying
+					m.textInput.Blur()
+					return m, m.queryDomain(domain)
+				}
+				m.errorMsg = "Geçersiz domain formatı"
+				m.state = stateError
+				return m, nil
+			}
+			if m.state == stateResult || m.state == stateError {
+				// Go back to input
+				m.state = stateInput
+				m.textInput.SetValue("")
+				m.textInput.Focus()
+				return m, textinput.Blink
+			}
+
+		case "tab":
+			// Cycle through history if available
+			if m.state == stateInput && len(m.history) > 0 {
+				// Set last queried domain
+				m.textInput.SetValue(m.history[len(m.history)-1].Domain)
+				m.textInput.CursorEnd()
+			}
+
+		case "1", "2", "3", "4", "5", "6", "7", "8", "9":
+			// Select and query from history using number keys
+			if m.state == stateInput && len(m.history) > 0 {
+				idx, _ := strconv.Atoi(msg.String())
+				idx-- // Convert 1-9 to 0-8
+
+				// Calculate visible range
+				visibleCount := m.getVisibleHistoryCount()
+				start := len(m.history) - visibleCount - m.historyOffset
+				if start < 0 {
+					start = 0
+				}
+
+				// Check if index is valid
+				actualIdx := start + idx
+				if idx < visibleCount && actualIdx < len(m.history) {
+					domain := m.history[actualIdx].Domain
+					m.currentQuery = domain
+					m.state = stateQuerying
+					m.textInput.Blur()
+					return m, m.queryDomain(domain)
+				}
+			}
+
+		case "up", "k":
+			// Scroll history up (show older items)
+			if m.state == stateInput && len(m.history) > m.getVisibleHistoryCount() {
+				maxOffset := len(m.history) - m.getVisibleHistoryCount()
+				if m.historyOffset < maxOffset {
+					m.historyOffset++
+				}
+			}
+
+		case "down", "j":
+			// Scroll history down (show newer items)
+			if m.state == stateInput && m.historyOffset > 0 {
+				m.historyOffset--
+			}
+		}
+
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+
+	case QueryMsg:
+		if msg.Error != nil {
+			m.errorMsg = msg.Error.Error()
+			m.state = stateError
+			m.history = append(m.history, HistoryItem{
+				Domain:    m.currentQuery,
+				Error:     m.errorMsg,
+				Timestamp: time.Now(),
+			})
+		} else {
+			m.result = msg.Result
+			m.duration = msg.Duration
+			m.state = stateResult
+			m.history = append(m.history, HistoryItem{
+				Domain:    m.currentQuery,
+				Result:    msg.Result,
+				duration:  msg.Duration,
+				Timestamp: time.Now(),
+			})
+		}
+		// Save history to file
+		saveHistory(m.history)
+		return m, nil
+	}
+
+	// Update text input
+	if m.state == stateInput {
+		m.textInput, cmd = m.textInput.Update(msg)
+	}
+
+	return m, cmd
+}
+
+// queryDomain performs the domain query asynchronously
+func (m TUIModel) queryDomain(domain string) tea.Cmd {
+	return func() tea.Msg {
+		startTime := time.Now()
+		var lastErr error
+
+		for retry := 0; retry < MaxRetries; retry++ {
+			// Get CAPTCHA
+			captchaResult, err := getCaptcha(m.config, nil)
+			if err != nil {
+				lastErr = err
+				if retry < MaxRetries-1 {
+					time.Sleep(RetryDelay)
+				}
+				continue
+			}
+
+			// Solve CAPTCHA
+			captchaCode, err := solveCaptchaWithGemini(captchaResult.ImageBuffer, m.config)
+			if err != nil {
+				lastErr = err
+				if retry < MaxRetries-1 {
+					time.Sleep(RetryDelay)
+				}
+				continue
+			}
+
+			// Query domain
+			html, err := sorgulaSite(domain, captchaCode, captchaResult.Cookies, m.config)
+			if err != nil {
+				lastErr = err
+				if retry < MaxRetries-1 {
+					time.Sleep(RetryDelay)
+				}
+				continue
+			}
+
+			// Check for CAPTCHA error
+			if isCaptchaError(html) {
+				lastErr = fmt.Errorf("CAPTCHA kodu hatalı")
+				if retry < MaxRetries-1 {
+					time.Sleep(RetryDelay)
+				}
+				continue
+			}
+
+			// Success
+			result := parseHTML(html, domain)
+			return QueryMsg{
+				Result:   result,
+				Duration: time.Since(startTime),
+			}
+		}
+
+		return QueryMsg{Error: lastErr}
+	}
+}
+
+// View implements tea.Model
+func (m TUIModel) View() string {
+	if m.quitting {
+		return "\n  👋 Görüşürüz!\n\n"
+	}
+
+	var s strings.Builder
+
+	// Title
+	s.WriteString("\n")
+	s.WriteString(titleStyle.Render(" 🔍 GİH Sorgu "))
+	s.WriteString("\n")
+	s.WriteString(subtitleStyle.Render("Güvenli İnternet Hizmeti Sorgu Aracı"))
+	s.WriteString("\n\n")
+
+	switch m.state {
+	case stateInput:
+		s.WriteString("  Domain girin:\n")
+		s.WriteString("  ")
+		s.WriteString(inputStyle.Render(m.textInput.View()))
+		s.WriteString("\n")
+
+		// Show history
+		if len(m.history) > 0 {
+			s.WriteString("\n")
+			visibleCount := m.getVisibleHistoryCount()
+			canScrollUp := m.historyOffset < len(m.history)-visibleCount
+			canScrollDown := m.historyOffset > 0
+
+			// Header with scroll indicators
+			scrollInfo := ""
+			if len(m.history) > visibleCount {
+				scrollInfo = fmt.Sprintf(" [%d/%d]", len(m.history)-m.historyOffset, len(m.history))
+			}
+			s.WriteString(historyStyle.Render(fmt.Sprintf("📜 Geçmiş%s:", scrollInfo)))
+			s.WriteString("\n")
+
+			// Show scroll up indicator
+			if canScrollUp {
+				s.WriteString(historyStyle.Render("     ▲ (↑ daha eski)"))
+				s.WriteString("\n")
+			}
+
+			// Calculate visible range
+			end := len(m.history) - m.historyOffset
+			start := end - visibleCount
+			if start < 0 {
+				start = 0
+			}
+
+			// Show items with numbers
+			num := 1
+			for i := start; i < end; i++ {
+				item := m.history[i]
+				icon := "✅"
+				if item.Error != "" {
+					icon = "❌"
+				} else if item.Result != nil && item.Result.EngelliMi {
+					icon = "🚫"
+				}
+				s.WriteString(historyStyle.Render(fmt.Sprintf("  [%d] %s %s", num, icon, item.Domain)))
+				s.WriteString("\n")
+				num++
+			}
+
+			// Show scroll down indicator
+			if canScrollDown {
+				s.WriteString(historyStyle.Render("     ▼ (↓ daha yeni)"))
+				s.WriteString("\n")
+			}
+		}
+
+		s.WriteString("\n")
+		s.WriteString(helpStyle.Render("  enter: sorgula • 1-9: geçmişten • ↑↓: kaydır • esc: çıkış"))
+
+	case stateQuerying:
+		s.WriteString("  ")
+		s.WriteString(statusStyle.Render(fmt.Sprintf("⏳ %s sorgulanıyor...", m.currentQuery)))
+		s.WriteString("\n\n")
+		s.WriteString(helpStyle.Render("  Lütfen bekleyin..."))
+
+	case stateResult:
+		s.WriteString(m.renderResult())
+		s.WriteString("\n")
+		s.WriteString(helpStyle.Render("  enter: yeni sorgu • esc: çıkış"))
+
+	case stateError:
+		s.WriteString("  ")
+		s.WriteString(errorMsgStyle.Render(fmt.Sprintf("❌ Hata: %s", m.errorMsg)))
+		s.WriteString("\n\n")
+		s.WriteString(helpStyle.Render("  enter: yeni sorgu • esc: çıkış"))
+	}
+
+	s.WriteString("\n")
+	return s.String()
+}
+
+// renderResult renders the query result
+func (m TUIModel) renderResult() string {
+	if m.result == nil {
+		return ""
+	}
+
+	var content strings.Builder
+
+	// Domain header
+	content.WriteString(fmt.Sprintf("📌 Domain: %s\n", m.result.Domain))
+	content.WriteString(fmt.Sprintf("⏱️  Süre: %s\n\n", formatDuration(m.duration)))
+
+	// Status
+	if m.result.EngelliMi {
+		content.WriteString(blockedStyle.Render("🚫 Durum: ENGELLİ"))
+	} else {
+		content.WriteString(accessibleStyle.Render("✅ Durum: ERİŞİLEBİLİR"))
+	}
+	content.WriteString("\n\n")
+
+	// Profiles
+	aileIcon := "✅"
+	if m.result.AileProfili == "engelli" {
+		aileIcon = "❌"
+	}
+	content.WriteString(fmt.Sprintf("👨‍👩‍👧 Aile Profili: %s %s\n", aileIcon, profilDurum(m.result.AileProfili)))
+
+	cocukIcon := "✅"
+	if m.result.CocukProfili == "engelli" {
+		cocukIcon = "❌"
+	}
+	content.WriteString(fmt.Sprintf("👶 Çocuk Profili: %s %s\n", cocukIcon, profilDurum(m.result.CocukProfili)))
+
+	// Block date
+	if m.result.EngelTarihi != nil {
+		content.WriteString(fmt.Sprintf("\n📅 Engel Tarihi: %s", *m.result.EngelTarihi))
+	}
+
+	return resultBoxStyle.Render(content.String())
+}
+
+// profilDurum converts profile status to Turkish
+func profilDurum(status string) string {
+	if status == "engelli" {
+		return "Engelli"
+	}
+	return "Erişilebilir"
+}
+
+// runTUI starts the TUI application
+func runTUI(cfg *Config) error {
+	// Suppress logs in TUI mode
+	jsonOutputMode = true
+
+	model := NewTUIModel(cfg)
+	p := tea.NewProgram(model, tea.WithAltScreen())
+
+	_, err := p.Run()
+	return err
+}
 
 // ============================================================================
 // INITIALIZATION
@@ -1012,7 +1571,9 @@ func showHelp() {
 v%s
 
 Kullanım:
-  gih-sorgu [seçenekler] <domain>
+  gih-sorgu                         İnteraktif TUI modu başlat
+  gih-sorgu <domain>                Tek domain sorgula
+  gih-sorgu [seçenekler] <domain>   Seçeneklerle sorgula
 
 Seçenekler:
   --liste <dosya>     Dosyadan site listesi oku
@@ -1020,11 +1581,18 @@ Seçenekler:
   --version, -v       Versiyon bilgisini göster
   --help, -h          Bu yardım mesajını göster
 
+TUI Modu:
+  Argümansız çalıştırıldığında interaktif arayüz açılır.
+  - Domain girin ve Enter ile sorgulayın
+  - Tab ile geçmiş sorguları görün
+  - Esc ile çıkın
+
 Örnekler:
-  gih-sorgu discord.com
-  gih-sorgu discord.com twitter.com google.com
-  gih-sorgu --liste sites.txt
-  gih-sorgu --json twitter.com
+  gih-sorgu                             # TUI modu
+  gih-sorgu discord.com                 # Tek domain
+  gih-sorgu discord.com twitter.com     # Çoklu domain
+  gih-sorgu --liste sites.txt           # Dosyadan
+  gih-sorgu --json twitter.com          # JSON çıktı
 
 Ortam Değişkenleri (.env dosyası veya sistem ortamı):
   GEMINI_API_KEY      Google Gemini API anahtarı (ZORUNLU)
@@ -1064,15 +1632,46 @@ func run() int {
 
 	// Handle --version
 	if args.ShowVersion {
-		fmt.Printf("Güvenli İnternet Sorgu Aracı v%s\n", Version)
+		fmt.Printf("Güvenli İnternet Sorgu Aracı v%s (%s)\n", Version, BuildCommit)
+		if BuildTime != "unknown" {
+			fmt.Printf("Build: %s\n", BuildTime)
+		}
 		return ExitSuccess
 	}
 
-	// Handle --help or no arguments
-	if args.ShowHelp || (len(args.Domains) == 0 && args.ListFile == "") {
+	// Handle --help
+	if args.ShowHelp {
 		showHelp()
-		if len(args.Domains) == 0 && args.ListFile == "" && !args.ShowHelp {
-			return ExitInvalidArgs
+		return ExitSuccess
+	}
+
+	// No arguments = TUI mode
+	if len(args.Domains) == 0 && args.ListFile == "" {
+		// Load config for TUI
+		cfg, err := loadConfig()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ %s\n", err)
+			fmt.Println()
+			fmt.Println("   Seçenek 1: .env dosyası oluşturun")
+			fmt.Println("   GEMINI_API_KEY=your_api_key")
+			fmt.Println()
+			fmt.Println("   Seçenek 2: Ortam değişkeni ayarlayın")
+			fmt.Println("   Windows: set GEMINI_API_KEY=your_api_key")
+			fmt.Println("   Linux/Mac: export GEMINI_API_KEY=your_api_key")
+			fmt.Println()
+			fmt.Println("   API anahtarı almak için: https://aistudio.google.com/app/apikey")
+			fmt.Println()
+			fmt.Print("   Çıkmak için Enter'a basın...")
+			bufio.NewReader(os.Stdin).ReadBytes('\n')
+			return ExitConfigError
+		}
+
+		if err := runTUI(cfg); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ TUI hatası: %s\n", err)
+			fmt.Println()
+			fmt.Print("Çıkmak için Enter'a basın...")
+			bufio.NewReader(os.Stdin).ReadBytes('\n')
+			return ExitGeneralError
 		}
 		return ExitSuccess
 	}
