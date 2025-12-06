@@ -223,17 +223,16 @@ var (
 			Bold(true).
 			Foreground(lipgloss.Color("#FFFFFF")).
 			Background(primaryColor).
-			Padding(0, 2).
-			MarginBottom(1)
+			Padding(0, 2)
 
 	subtitleStyle = lipgloss.NewStyle().
-			Foreground(secondaryColor).
-			MarginBottom(1)
+			Foreground(secondaryColor)
 
 	inputStyle = lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
 			BorderForeground(secondaryColor).
-			Padding(0, 1)
+			Padding(0, 1).
+			MarginLeft(1)
 
 	resultBoxStyle = lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
@@ -258,8 +257,7 @@ var (
 			MarginTop(1)
 
 	historyStyle = lipgloss.NewStyle().
-			Foreground(mutedColor).
-			PaddingLeft(2)
+			Foreground(mutedColor)
 
 	errorMsgStyle = lipgloss.NewStyle().
 			Foreground(errorColor).
@@ -344,6 +342,20 @@ func saveHistory(items []HistoryItem) error {
 	}
 
 	return os.WriteFile(historyFileName, data, 0644)
+}
+
+// upsertHistory adds or updates a domain in history (unique by domain, moves to end on update)
+func upsertHistory(items []HistoryItem, newItem HistoryItem) []HistoryItem {
+	// Find existing domain (case-insensitive)
+	for i, item := range items {
+		if strings.EqualFold(item.Domain, newItem.Domain) {
+			// Remove existing item
+			items = append(items[:i], items[i+1:]...)
+			break
+		}
+	}
+	// Append new item at the end
+	return append(items, newItem)
 }
 
 // TUIModel is the Bubbletea model for the TUI
@@ -509,7 +521,7 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Error != nil {
 			m.errorMsg = msg.Error.Error()
 			m.state = stateError
-			m.history = append(m.history, HistoryItem{
+			m.history = upsertHistory(m.history, HistoryItem{
 				Domain:    m.currentQuery,
 				Error:     m.errorMsg,
 				Timestamp: time.Now(),
@@ -518,7 +530,7 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.result = msg.Result
 			m.duration = msg.Duration
 			m.state = stateResult
-			m.history = append(m.history, HistoryItem{
+			m.history = upsertHistory(m.history, HistoryItem{
 				Domain:    m.currentQuery,
 				Result:    msg.Result,
 				duration:  msg.Duration,
@@ -606,15 +618,16 @@ func (m TUIModel) View() string {
 
 	// Title
 	s.WriteString("\n")
-	s.WriteString(titleStyle.Render(" 🔍 GİH Sorgu "))
-	s.WriteString("\n")
+	s.WriteString(" ")
+	s.WriteString(titleStyle.Render("🔍 GİH Sorgu"))
+	s.WriteString("\n\n")
+	s.WriteString(" ")
 	s.WriteString(subtitleStyle.Render("Güvenli İnternet Hizmeti Sorgu Aracı"))
 	s.WriteString("\n\n")
 
 	switch m.state {
 	case stateInput:
-		s.WriteString("  Domain girin:\n")
-		s.WriteString("  ")
+		s.WriteString(" Domain girin:\n")
 		s.WriteString(inputStyle.Render(m.textInput.View()))
 		s.WriteString("\n")
 
@@ -630,13 +643,11 @@ func (m TUIModel) View() string {
 			if len(m.history) > visibleCount {
 				scrollInfo = fmt.Sprintf(" [%d/%d]", len(m.history)-m.historyOffset, len(m.history))
 			}
-			s.WriteString(historyStyle.Render(fmt.Sprintf("📜 Geçmiş%s:", scrollInfo)))
-			s.WriteString("\n")
+			s.WriteString(fmt.Sprintf(" 📜 Geçmiş%s:\n", scrollInfo))
 
 			// Show scroll up indicator
 			if canScrollUp {
-				s.WriteString(historyStyle.Render("     ▲ (↑ daha eski)"))
-				s.WriteString("\n")
+				s.WriteString("   ▲ (↑ daha eski)\n")
 			}
 
 			// Calculate visible range
@@ -656,37 +667,35 @@ func (m TUIModel) View() string {
 				} else if item.Result != nil && item.Result.EngelliMi {
 					icon = "🚫"
 				}
-				s.WriteString(historyStyle.Render(fmt.Sprintf("  [%d] %s %s", num, icon, item.Domain)))
-				s.WriteString("\n")
+				s.WriteString(fmt.Sprintf(" [%d] %s %s\n", num, icon, item.Domain))
 				num++
 			}
 
 			// Show scroll down indicator
 			if canScrollDown {
-				s.WriteString(historyStyle.Render("     ▼ (↓ daha yeni)"))
-				s.WriteString("\n")
+				s.WriteString("   ▼ (↓ daha yeni)\n")
 			}
 		}
 
 		s.WriteString("\n")
-		s.WriteString(helpStyle.Render("  enter: sorgula • 1-9: geçmişten • ↑↓: kaydır • esc: çıkış"))
+		s.WriteString(" enter: sorgula • 1-9: geçmişten • ↑↓: kaydır • esc: çıkış")
 
 	case stateQuerying:
-		s.WriteString("  ")
+		s.WriteString(" ")
 		s.WriteString(statusStyle.Render(fmt.Sprintf("⏳ %s sorgulanıyor...", m.currentQuery)))
 		s.WriteString("\n\n")
-		s.WriteString(helpStyle.Render("  Lütfen bekleyin..."))
+		s.WriteString(" Lütfen bekleyin...")
 
 	case stateResult:
 		s.WriteString(m.renderResult())
 		s.WriteString("\n")
-		s.WriteString(helpStyle.Render("  enter: yeni sorgu • esc: çıkış"))
+		s.WriteString(" enter: yeni sorgu • esc: çıkış")
 
 	case stateError:
-		s.WriteString("  ")
+		s.WriteString(" ")
 		s.WriteString(errorMsgStyle.Render(fmt.Sprintf("❌ Hata: %s", m.errorMsg)))
 		s.WriteString("\n\n")
-		s.WriteString(helpStyle.Render("  enter: yeni sorgu • esc: çıkış"))
+		s.WriteString(" enter: yeni sorgu • esc: çıkış")
 	}
 
 	s.WriteString("\n")
