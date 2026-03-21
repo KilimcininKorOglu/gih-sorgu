@@ -369,6 +369,7 @@ type TUIModel struct {
 	errorMsg      string
 	history       []HistoryItem
 	historyOffset int // Scroll offset for history view
+	tabIndex      int // Current tab cycle index (-1 = not cycling)
 	width         int
 	height        int
 	quitting      bool
@@ -400,6 +401,7 @@ func NewTUIModel(cfg *Config) TUIModel {
 		config:        cfg,
 		history:       history,
 		historyOffset: 0,
+		tabIndex:      -1,
 		width:         80,
 		height:        24,
 	}
@@ -432,6 +434,11 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		// Reset tab cycle on any key except tab itself
+		if msg.String() != "tab" {
+			m.tabIndex = -1
+		}
+
 		switch msg.String() {
 		case "ctrl+c", "esc":
 			if m.state == stateResult || m.state == stateError {
@@ -466,35 +473,16 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "tab":
-			// Cycle through history if available
+			// Cycle through history (newest to oldest)
 			if m.state == stateInput && len(m.history) > 0 {
-				// Set last queried domain
-				m.textInput.SetValue(m.history[len(m.history)-1].Domain)
+				m.tabIndex++
+				if m.tabIndex >= len(m.history) {
+					m.tabIndex = 0
+				}
+				// Pick from end (newest first)
+				histIdx := len(m.history) - 1 - m.tabIndex
+				m.textInput.SetValue(m.history[histIdx].Domain)
 				m.textInput.CursorEnd()
-			}
-
-		case "1", "2", "3", "4", "5", "6", "7", "8", "9":
-			// Select and query from history using number keys
-			if m.state == stateInput && len(m.history) > 0 {
-				idx, _ := strconv.Atoi(msg.String())
-				idx-- // Convert 1-9 to 0-8
-
-				// Calculate visible range
-				visibleCount := m.getVisibleHistoryCount()
-				start := len(m.history) - visibleCount - m.historyOffset
-				if start < 0 {
-					start = 0
-				}
-
-				// Check if index is valid
-				actualIdx := start + idx
-				if idx < visibleCount && actualIdx < len(m.history) {
-					domain := m.history[actualIdx].Domain
-					m.currentQuery = domain
-					m.state = stateQuerying
-					m.textInput.Blur()
-					return m, m.queryDomain(domain)
-				}
 			}
 
 		case "up", "k":
@@ -657,8 +645,6 @@ func (m TUIModel) View() string {
 				start = 0
 			}
 
-			// Show items with numbers
-			num := 1
 			for i := start; i < end; i++ {
 				item := m.history[i]
 				icon := "✅"
@@ -667,8 +653,7 @@ func (m TUIModel) View() string {
 				} else if item.Result != nil && item.Result.EngelliMi {
 					icon = "🚫"
 				}
-				s.WriteString(fmt.Sprintf(" [%d] %s %s\n", num, icon, item.Domain))
-				num++
+				s.WriteString(fmt.Sprintf("   %s %s\n", icon, item.Domain))
 			}
 
 			// Show scroll down indicator
@@ -678,7 +663,7 @@ func (m TUIModel) View() string {
 		}
 
 		s.WriteString("\n")
-		s.WriteString(" enter: sorgula • 1-9: geçmişten • ↑↓: kaydır • esc: çıkış")
+		s.WriteString(" enter: sorgula • tab: geçmişten seç • ↑↓: kaydır • esc: çıkış")
 
 	case stateQuerying:
 		s.WriteString(" ")
