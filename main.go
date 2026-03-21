@@ -529,7 +529,9 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			})
 		}
 		// Save history to file
-		saveHistory(m.history)
+		if err := saveHistory(m.history); err != nil {
+			fmt.Fprintf(os.Stderr, "geçmiş kaydedilemedi: %s\n", err)
+		}
 		return m, nil
 	}
 
