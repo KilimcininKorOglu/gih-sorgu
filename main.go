@@ -280,12 +280,12 @@ const (
 
 // HistoryItem represents a queried domain result
 type HistoryItem struct {
-	Domain       string       `json:"domain"`
-	Result       *QueryResult `json:"result,omitempty"`
-	DurationMs   int64        `json:"durationMs"`
-	Error        string       `json:"error,omitempty"`
-	Timestamp    time.Time    `json:"timestamp"`
-	duration     time.Duration
+	Domain     string       `json:"domain"`
+	Result     *QueryResult `json:"result,omitempty"`
+	DurationMs int64        `json:"durationMs"`
+	Error      string       `json:"error,omitempty"`
+	Timestamp  time.Time    `json:"timestamp"`
+	duration   time.Duration
 }
 
 // HistoryFile represents the history.json structure
