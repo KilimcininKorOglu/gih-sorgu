@@ -119,6 +119,7 @@ type CLIArgs struct {
 	JSONOutput  bool
 	ShowHelp    bool
 	ShowVersion bool
+	Error       string
 }
 
 // Gemini API types
@@ -1540,6 +1541,8 @@ func parseArgs() *CLIArgs {
 			if i+1 < len(osArgs) {
 				args.ListFile = osArgs[i+1]
 				i++
+			} else {
+				args.Error = "--liste seçeneği bir dosya adı gerektirir"
 			}
 		default:
 			if !strings.HasPrefix(arg, "--") {
@@ -1653,6 +1656,12 @@ func run() int {
 	if args.ShowHelp {
 		showHelp()
 		return ExitSuccess
+	}
+
+	// Handle parse errors
+	if args.Error != "" {
+		fmt.Fprintf(os.Stderr, "❌ %s\n", args.Error)
+		return ExitInvalidArgs
 	}
 
 	// No arguments = TUI mode
