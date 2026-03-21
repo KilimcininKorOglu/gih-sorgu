@@ -101,6 +101,7 @@ type QueryResult struct {
 	AileProfili  string  `json:"aileProfili"`
 	CocukProfili string  `json:"cocukProfili"`
 	EngelliMi    bool    `json:"engelliMi"`
+	Parsed       bool    `json:"parsed"`
 	Mesaj        *string `json:"mesaj,omitempty"`
 	EngelTarihi  *string `json:"engelTarihi,omitempty"`
 }
@@ -175,6 +176,7 @@ type JSONOutput struct {
 	AileProfili            string  `json:"aileProfili"`
 	CocukProfili           string  `json:"cocukProfili"`
 	EngelliMi              bool    `json:"engelliMi"`
+	Parsed                 bool    `json:"parsed"`
 	Mesaj                  *string `json:"mesaj,omitempty"`
 	EngelTarihi            *string `json:"engelTarihi,omitempty"`
 }
@@ -700,29 +702,35 @@ func (m TUIModel) renderResult() string {
 	content.WriteString(fmt.Sprintf("⏱️  Süre: %s\n\n", formatDuration(m.duration)))
 
 	// Status
-	if m.result.EngelliMi {
+	if !m.result.Parsed {
+		content.WriteString(errorMsgStyle.Render("⚠️ Durum: BİLİNMİYOR"))
+		content.WriteString("\n\n")
+		content.WriteString("Yanıt ayrıştırılamadı. Site yapısı değişmiş olabilir.")
+	} else if m.result.EngelliMi {
 		content.WriteString(blockedStyle.Render("🚫 Durum: ENGELLİ"))
+		content.WriteString("\n\n")
+
+		aileIcon := "✅"
+		if m.result.AileProfili == "engelli" {
+			aileIcon = "❌"
+		}
+		content.WriteString(fmt.Sprintf("👨‍👩‍👧 Aile Profili: %s %s\n", aileIcon, profilDurum(m.result.AileProfili)))
+
+		cocukIcon := "✅"
+		if m.result.CocukProfili == "engelli" {
+			cocukIcon = "❌"
+		}
+		content.WriteString(fmt.Sprintf("👶 Çocuk Profili: %s %s\n", cocukIcon, profilDurum(m.result.CocukProfili)))
+
+		if m.result.EngelTarihi != nil {
+			content.WriteString(fmt.Sprintf("\n📅 Engel Tarihi: %s", *m.result.EngelTarihi))
+		}
 	} else {
 		content.WriteString(accessibleStyle.Render("✅ Durum: ERİŞİLEBİLİR"))
-	}
-	content.WriteString("\n\n")
+		content.WriteString("\n\n")
 
-	// Profiles
-	aileIcon := "✅"
-	if m.result.AileProfili == "engelli" {
-		aileIcon = "❌"
-	}
-	content.WriteString(fmt.Sprintf("👨‍👩‍👧 Aile Profili: %s %s\n", aileIcon, profilDurum(m.result.AileProfili)))
-
-	cocukIcon := "✅"
-	if m.result.CocukProfili == "engelli" {
-		cocukIcon = "❌"
-	}
-	content.WriteString(fmt.Sprintf("👶 Çocuk Profili: %s %s\n", cocukIcon, profilDurum(m.result.CocukProfili)))
-
-	// Block date
-	if m.result.EngelTarihi != nil {
-		content.WriteString(fmt.Sprintf("\n📅 Engel Tarihi: %s", *m.result.EngelTarihi))
+		content.WriteString("👨‍👩‍👧 Aile Profili: ✅ Erişilebilir\n")
+		content.WriteString("👶 Çocuk Profili: ✅ Erişilebilir\n")
 	}
 
 	return resultBoxStyle.Render(content.String())
@@ -1363,6 +1371,7 @@ func parseHTML(html, domain string) *QueryResult {
 		}
 
 		result.EngelliMi = result.AileProfili == "engelli" || result.CocukProfili == "engelli"
+		result.Parsed = true
 
 		// Extract date and message based on status
 		if result.EngelliMi {
@@ -1385,6 +1394,7 @@ func parseHTML(html, domain string) *QueryResult {
 	// Fallback: Check for blocked status (error.png)
 	if strings.Contains(html, "error.png") {
 		result.EngelliMi = true
+		result.Parsed = true
 		result.AileProfili = "engelli"
 		result.CocukProfili = "engelli"
 
@@ -1404,6 +1414,7 @@ func parseHTML(html, domain string) *QueryResult {
 	// Fallback: Check for accessible status (success.png or tbl_sorgu table)
 	if strings.Contains(html, "success.png") || strings.Contains(html, "tbl_sorgu") {
 		result.EngelliMi = false
+		result.Parsed = true
 		result.AileProfili = "erisim"
 		result.CocukProfili = "erisim"
 
@@ -1431,7 +1442,11 @@ func printResult(result *QueryResult, duration time.Duration) {
 	}
 	fmt.Println(strings.Repeat("═", 60))
 
-	if result.EngelliMi {
+	if !result.Parsed {
+		fmt.Println("⚠️ Durum: BİLİNMİYOR")
+		fmt.Println(strings.Repeat("─", 60))
+		fmt.Println("Yanıt ayrıştırılamadı. Site yapısı değişmiş olabilir.")
+	} else if result.EngelliMi {
 		fmt.Println("🚫 Durum: ENGELLİ")
 		fmt.Println(strings.Repeat("─", 60))
 
@@ -1480,6 +1495,7 @@ func outputJSON(result *QueryResult, duration time.Duration) {
 		AileProfili:            result.AileProfili,
 		CocukProfili:           result.CocukProfili,
 		EngelliMi:              result.EngelliMi,
+		Parsed:                 result.Parsed,
 		Mesaj:                  result.Mesaj,
 		EngelTarihi:            result.EngelTarihi,
 	}
