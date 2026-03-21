@@ -1768,6 +1768,7 @@ func run() int {
 	// Query domains
 	var results []*QueryResult
 	var sharedSession map[string]string
+	lastExitCode := ExitSuccess
 
 	for i, domain := range validDomains {
 		var result *QueryResult
@@ -1855,6 +1856,12 @@ func run() int {
 			} else {
 				fmt.Fprintf(os.Stderr, "❌ %s sorgulanırken hata: %s\n", domain, lastErr)
 			}
+			errMsg := lastErr.Error()
+			if strings.Contains(errMsg, "Gemini API") {
+				lastExitCode = ExitAPIError
+			} else {
+				lastExitCode = ExitNetworkError
+			}
 		}
 
 		// Rate limiting
@@ -1887,5 +1894,5 @@ func run() int {
 		fmt.Println(strings.Repeat("═", 60))
 	}
 
-	return ExitSuccess
+	return lastExitCode
 }
