@@ -14,14 +14,14 @@ Google Gemini API kullanarak CAPTCHA'yı otomatik çözer. Tek dosya, cross-plat
 
 [Releases](https://github.com/KilimcininKorOglu/gih-sorgu/releases) sayfasından platformunuza uygun binary'yi indirin:
 
-| Platform | Mimari | Dosya |
-|----------|--------|-------|
-| Windows | x64 | `gih-sorgu-windows-amd64.exe` |
-| Windows | ARM64 | `gih-sorgu-windows-arm64.exe` |
-| Linux | x64 | `gih-sorgu-linux-amd64` |
-| Linux | ARM64 | `gih-sorgu-linux-arm64` |
-| macOS | Intel | `gih-sorgu-darwin-amd64` |
-| macOS | Apple Silicon | `gih-sorgu-darwin-arm64` |
+| Platform | Mimari        | Dosya                         |
+|----------|---------------|-------------------------------|
+| Windows  | x64           | `gih-sorgu-windows-amd64.exe` |
+| Windows  | ARM64         | `gih-sorgu-windows-arm64.exe` |
+| Linux    | x64           | `gih-sorgu-linux-amd64`       |
+| Linux    | ARM64         | `gih-sorgu-linux-arm64`       |
+| macOS    | Intel         | `gih-sorgu-darwin-amd64`      |
+| macOS    | Apple Silicon | `gih-sorgu-darwin-arm64`      |
 
 ### Kaynak Koddan Derleme
 
@@ -52,13 +52,13 @@ build.bat build-all   # Windows
 GEMINI_API_KEY=your_api_key_here
 ```
 
-| Değişken | Zorunlu | Varsayılan | Açıklama |
-|----------|---------|------------|----------|
-| `GEMINI_API_KEY` | Evet | - | Google Gemini API anahtarı |
-| `GEMINI_MODEL` | - | `gemini-2.5-flash` | Kullanılacak Gemini modeli |
-| `GEMINI_MAX_TOKENS` | - | `256` | Maksimum çıktı token sayısı (1-8192) |
-| `USER_AGENT` | - | Firefox UA | HTTP isteklerinde User-Agent |
-| `RATE_LIMIT_DELAY` | - | `500` | Sorgular arası bekleme (ms, 0-10000) |
+| Değişken            | Zorunlu | Varsayılan         | Açıklama                             |
+|---------------------|---------|--------------------|--------------------------------------|
+| `GEMINI_API_KEY`    | Evet    | -                  | Google Gemini API anahtarı           |
+| `GEMINI_MODEL`      | -       | `gemini-2.5-flash` | Kullanılacak Gemini modeli           |
+| `GEMINI_MAX_TOKENS` | -       | `256`              | Maksimum çıktı token sayısı (1-8192) |
+| `USER_AGENT`        | -       | Firefox UA         | HTTP isteklerinde User-Agent         |
+| `RATE_LIMIT_DELAY`  | -       | `500`              | Sorgular arası bekleme (ms, 0-10000) |
 
 ## Kullanım
 
@@ -144,14 +144,14 @@ google.com
 
 ## Exit Kodları
 
-| Kod | Anlam |
-|-----|-------|
-| 0 | Başarılı |
-| 1 | Genel hata |
-| 2 | Geçersiz argüman |
-| 3 | Config hatası (API key eksik) |
-| 4 | Ağ hatası |
-| 5 | API hatası |
+| Kod | Anlam                         |
+|-----|-------------------------------|
+| 0   | Başarılı                      |
+| 1   | Genel hata                    |
+| 2   | Geçersiz argüman              |
+| 3   | Config hatası (API key eksik) |
+| 4   | Ağ hatası                     |
+| 5   | API hatası                    |
 
 ## Güvenlik Notu
 
