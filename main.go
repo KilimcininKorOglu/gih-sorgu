@@ -219,7 +219,6 @@ var (
 	errorColor     = lipgloss.Color("#E74C3C")
 	warningColor   = lipgloss.Color("#F39C12")
 	mutedColor     = lipgloss.Color("#7F8C8D")
-	bgColor        = lipgloss.Color("#1A1A2E")
 
 	// Styles
 	titleStyle = lipgloss.NewStyle().
@@ -254,13 +253,6 @@ var (
 	statusStyle = lipgloss.NewStyle().
 			Foreground(warningColor).
 			Italic(true)
-
-	helpStyle = lipgloss.NewStyle().
-			Foreground(mutedColor).
-			MarginTop(1)
-
-	historyStyle = lipgloss.NewStyle().
-			Foreground(mutedColor)
 
 	errorMsgStyle = lipgloss.NewStyle().
 			Foreground(errorColor).
