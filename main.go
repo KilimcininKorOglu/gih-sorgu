@@ -762,8 +762,6 @@ func runTUI(cfg *Config) error {
 // ============================================================================
 
 func init() {
-	rand.Seed(time.Now().UnixNano())
-
 	// Secure HTTP client for Gemini API
 	secureClient = &http.Client{
 		Timeout: DefaultTimeout,
