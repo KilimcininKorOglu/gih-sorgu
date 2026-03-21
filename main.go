@@ -1084,7 +1084,10 @@ func getSessionCookies(cfg *Config) (map[string]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("session request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+	}()
 
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("session failed: HTTP %d", resp.StatusCode)
