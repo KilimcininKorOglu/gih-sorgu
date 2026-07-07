@@ -36,7 +36,6 @@ build.bat build       # Windows
 
 # Tum platformlar icin cross-compile (dist/ dizinine)
 make build-all        # Linux/macOS
-./build.sh            # Linux/macOS (alternatif)
 build.bat build-all   # Windows
 ```
 
@@ -46,7 +45,7 @@ build.bat build-all   # Windows
 
 ## Yapılandırma
 
-`.env` dosyasını executable ile aynı dizine oluşturun:
+`.env` dosyasını executable ile aynı dizine oluşturun. Geliştirme sırasında çalışma dizinindeki `.env` dosyası da okunur.
 
 ```env
 GEMINI_API_KEY=your_api_key_here
@@ -72,10 +71,9 @@ Argümansız çalıştırınca interaktif TUI açılır (Windows'ta exe'ye çift
 
 **TUI Kontrolleri:**
 - `Enter` - Domain sorgula
-- `1-9` - Geçmişten seç ve sorgula
+- `Tab` - Geçmişten seç (yeniden eskiye döngü)
 - `↑/↓` - Geçmişte gezin
-- `Tab` - Son sorguyu kopyala
-- `Esc` - Çıkış
+- `Esc` - Çıkış (sonuç/hata ekranında girişe döner)
 
 ### CLI Modu
 
@@ -123,10 +121,12 @@ Argümansız çalıştırınca interaktif TUI açılır (Windows'ta exe'ye çift
   "timestamp": "2024-12-06T12:00:00Z",
   "status": true,
   "queryDuration": 1950,
+  "queryDurationFormatted": "1.95s",
   "domain": "discord.com",
-  "engelliMi": true,
   "aileProfili": "engelli",
   "cocukProfili": "engelli",
+  "engelliMi": true,
+  "parsed": true,
   "engelTarihi": "2024-10-20 22:34:15",
   "mesaj": "Bu alan adı aile ve çocuk profilinde görüntülenememektedir."
 }
@@ -160,7 +160,7 @@ google.com
 
 ## Geçmiş
 
-Sorgu geçmişi `history.json` dosyasında saklanır (max 100 kayıt). TUI modunda `1-9` tuşlarıyla geçmişten hızlıca seçim yapabilirsiniz.
+Sorgu geçmişi `history.json` dosyasında saklanır (max 100 kayıt). TUI modunda `Tab` tuşuyla geçmişten seçim yapabilirsiniz.
 
 ## Lisans
 

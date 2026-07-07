@@ -22,7 +22,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.24.4'
 
       - name: Get dependencies
         run: go mod tidy
@@ -207,10 +207,9 @@ jobs:
             ### TUI Controls
 
             - `Enter` - Query domain
-            - `1-9` - Select from history and query
+            - `Tab` - Cycle through history from newest to oldest
             - `↑/↓` - Scroll history
-            - `Tab` - Copy last query to input
-            - `Esc` - Exit
+            - `Esc` - Exit or return to input from result/error screens
 
             ### Requirements
 

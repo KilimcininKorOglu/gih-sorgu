@@ -1,5 +1,5 @@
 /**
- * Güvenli İnternet Hizmeti (GİH) Sorgu Tool v1.0.0
+ * Güvenli İnternet Hizmeti (GİH) Sorgu Tool
  * ==================================================
  * Queries domain blocking status on Turkey's Safe Internet Service.
  * Uses Gemini API for automatic CAPTCHA solving.
@@ -848,9 +848,7 @@ func formatDuration(d time.Duration) string {
 // ============================================================================
 
 // loadEnvFile loads environment variables from .env file
-func loadEnvFile() error {
-	envPath := filepath.Join(".", ".env")
-
+func loadEnvFileAt(envPath string) error {
 	file, err := os.Open(envPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -893,6 +891,36 @@ func loadEnvFile() error {
 	}
 
 	return scanner.Err()
+}
+
+func envFilePaths() []string {
+	paths := []string{}
+	seen := map[string]bool{}
+
+	addPath := func(path string) {
+		cleanPath := filepath.Clean(path)
+		if !seen[cleanPath] {
+			paths = append(paths, cleanPath)
+			seen[cleanPath] = true
+		}
+	}
+
+	if exePath, err := os.Executable(); err == nil {
+		addPath(filepath.Join(filepath.Dir(exePath), ".env"))
+	}
+	addPath(filepath.Join(".", ".env"))
+
+	return paths
+}
+
+func loadEnvFile() error {
+	var firstErr error
+	for _, envPath := range envFilePaths() {
+		if err := loadEnvFileAt(envPath); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
 }
 
 // loadConfig loads and validates configuration
@@ -1592,8 +1620,9 @@ Seçenekler:
 TUI Modu:
   Argümansız çalıştırıldığında interaktif arayüz açılır.
   - Domain girin ve Enter ile sorgulayın
-  - Tab ile geçmiş sorguları görün
-  - Esc ile çıkın
+  - Tab ile geçmişten seçim yapın
+  - ↑/↓ ile geçmişte gezinin
+  - Esc ile çıkın veya sonuç ekranından girişe dönün
 
 Örnekler:
   gih-sorgu                             # TUI modu
