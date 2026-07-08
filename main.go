@@ -324,7 +324,13 @@ const maxHistoryItems = 100
 func loadHistory() []HistoryItem {
 	data, err := os.ReadFile(historyFileName)
 	if err != nil {
-		return []HistoryItem{}
+		// Try backup file
+		backupFile := historyFileName + ".bak"
+		data, err = os.ReadFile(backupFile)
+		if err != nil {
+			return []HistoryItem{}
+		}
+		fmt.Fprintf(os.Stderr, "⚠️ history.json yüklenemedi, backup kullanılıyor\n")
 	}
 
 	var hf HistoryFile
@@ -362,6 +368,26 @@ func saveHistory(items []HistoryItem) error {
 	data, err := json.MarshalIndent(hf, "", "  ")
 	if err != nil {
 		return err
+	}
+
+	// Create backup of existing file before overwrite
+	if _, err := os.Stat(historyFileName); err == nil {
+		backupFile := historyFileName + ".bak"
+		src, err := os.Open(historyFileName)
+		if err != nil {
+			logln("⚠️ Backup oluşturulamadı")
+		} else {
+			defer src.Close()
+			dst, err := os.Create(backupFile)
+			if err != nil {
+				logln("⚠️ Backup oluşturulamadı")
+			} else {
+				defer dst.Close()
+				if _, err := io.Copy(dst, src); err != nil {
+					logln("⚠️ Backup oluşturulamadı")
+				}
+			}
+		}
 	}
 
 	tmpFile := historyFileName + ".tmp"
