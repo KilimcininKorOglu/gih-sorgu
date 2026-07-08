@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
+	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -451,4 +453,68 @@ func TestDecompressResponse(t *testing.T) {
 			t.Fatalf("got %q, want test data", string(got))
 		}
 	})
+}
+
+func TestOutputJSONError(t *testing.T) {
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe error: %v", err)
+	}
+	os.Stdout = w
+
+	domain := "example.com"
+	outputJSONError(&domain, "test error", ErrorCodeNetworkError)
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	out, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatalf("read captured stdout: %v", err)
+	}
+
+	var got JSONErrorOutput
+	if err := json.Unmarshal(out, &got); err != nil {
+		t.Fatalf("unmarshal output: %v", err)
+	}
+
+	if got.Status != false {
+		t.Fatalf("Status = %v, want false", got.Status)
+	}
+	if got.Error != "test error" {
+		t.Fatalf("Error = %q, want %q", got.Error, "test error")
+	}
+	if got.ErrorCode != ErrorCodeNetworkError {
+		t.Fatalf("ErrorCode = %q, want %q", got.ErrorCode, ErrorCodeNetworkError)
+	}
+	if got.Domain == nil || *got.Domain != domain {
+		t.Fatalf("Domain = %#v, want %q", got.Domain, domain)
+	}
+}
+
+func TestClassifyError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"nil", nil, ""},
+		{"gemini auth", errors.New("Gemini API yetkilendirme hatası: invalid key"), ErrorCodeAPIAuthError},
+		{"gemini quota", errors.New("Gemini API kota aşıldı: rate limit"), ErrorCodeAPIError},
+		{"gemini generic", errors.New("Gemini API hatası: HTTP 500 - broken"), ErrorCodeAPIError},
+		{"captcha rejected", errors.New("CAPTCHA kodu hatalı"), ErrorCodeCaptchaSolveError},
+		{"captcha download timeout", errors.New("CAPTCHA indirme başarısız: istek zaman aşımına uğradı, daha sonra tekrar deneyin"), ErrorCodeNetworkError},
+		{"query refused", errors.New("sorgu başarısız: sunucu bağlantıyı reddetti, daha sonra tekrar deneyin"), ErrorCodeNetworkError},
+		{"waf blocked", errors.New("CAPTCHA isteği WAF tarafından engellendi - cookie sorunu"), ErrorCodeNetworkError},
+		{"general", errors.New("something else"), ErrorCodeGeneralError},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := classifyError(tt.err); got != tt.want {
+				t.Fatalf("classifyError(%q) = %q, want %q", tt.err, got, tt.want)
+			}
+		})
+	}
 }

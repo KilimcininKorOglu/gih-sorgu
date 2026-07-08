@@ -65,6 +65,17 @@ const (
 	ExitAPIError     = 5
 )
 
+// Error codes for machine-readable JSON error output
+const (
+	ErrorCodeInvalidArgs       = "INVALID_ARGUMENTS"
+	ErrorCodeConfigError       = "CONFIG_ERROR"
+	ErrorCodeNetworkError      = "NETWORK_ERROR"
+	ErrorCodeAPIError          = "API_ERROR"
+	ErrorCodeAPIAuthError      = "API_AUTH_ERROR"
+	ErrorCodeCaptchaSolveError = "CAPTCHA_SOLVE_ERROR"
+	ErrorCodeGeneralError      = "GENERAL_ERROR"
+)
+
 // Default values
 const (
 	DefaultGeminiModel    = "gemini-2.5-flash"
@@ -221,6 +232,7 @@ type JSONErrorOutput struct {
 	Status    bool    `json:"status"`
 	Domain    *string `json:"domain,omitempty"`
 	Error     string  `json:"error"`
+	ErrorCode string  `json:"errorCode,omitempty"`
 }
 
 // ============================================================================
@@ -1782,13 +1794,55 @@ func outputJSON(result *QueryResult, duration time.Duration) {
 	fmt.Println(string(jsonBytes))
 }
 
+// classifyError maps an error to a machine-readable error code.
+func classifyError(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	errStr := err.Error()
+
+	// Gemini API auth failures (permanent, non-retryable)
+	if isPermanentError(err) {
+		return ErrorCodeAPIAuthError
+	}
+
+	// Other Gemini API failures
+	if strings.Contains(errStr, "Gemini API") {
+		return ErrorCodeAPIError
+	}
+
+	// CAPTCHA solved by Gemini but rejected by GIH
+	if strings.Contains(errStr, "CAPTCHA kodu hatalı") {
+		return ErrorCodeCaptchaSolveError
+	}
+
+	// Network or transport failures
+	if strings.Contains(errStr, "sorgu başarısız") ||
+		strings.Contains(errStr, "CAPTCHA indirme başarısız") ||
+		strings.Contains(errStr, "oturum isteği başarısız") ||
+		strings.Contains(errStr, "oturum başarısız") ||
+		strings.Contains(errStr, "zaman aşımına uğradı") ||
+		strings.Contains(errStr, "sunucuya ulaşılamıyor") ||
+		strings.Contains(errStr, "sunucu bağlantıyı reddetti") ||
+		strings.Contains(errStr, "bağlantı sıfırlandı") ||
+		strings.Contains(errStr, "internet bağlantınızı") ||
+		strings.Contains(errStr, "geçersiz CAPTCHA yanıtı") ||
+		strings.Contains(errStr, "WAF tarafından engellendi") {
+		return ErrorCodeNetworkError
+	}
+
+	return ErrorCodeGeneralError
+}
+
 // outputJSONError outputs error in JSON format
-func outputJSONError(domain *string, message string) {
+func outputJSONError(domain *string, message string, errorCode string) {
 	output := JSONErrorOutput{
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 		Status:    false,
 		Domain:    domain,
 		Error:     message,
+		ErrorCode: errorCode,
 	}
 
 	jsonBytes, _ := json.MarshalIndent(output, "", "  ")
@@ -1985,7 +2039,7 @@ func run() int {
 		fileDomains, err := loadDomainsFromFile(args.ListFile)
 		if err != nil {
 			if jsonOutputMode {
-				outputJSONError(nil, err.Error())
+				outputJSONError(nil, err.Error(), ErrorCodeInvalidArgs)
 			} else {
 				fmt.Fprintf(os.Stderr, "❌ %s\n", err)
 			}
@@ -2010,7 +2064,7 @@ func run() int {
 
 	if len(validDomains) == 0 {
 		if jsonOutputMode {
-			outputJSONError(nil, "Geçerli domain bulunamadı")
+			outputJSONError(nil, "Geçerli domain bulunamadı", ErrorCodeInvalidArgs)
 		} else {
 			fmt.Fprintln(os.Stderr, "❌ Geçerli domain bulunamadı!")
 		}
@@ -2051,7 +2105,7 @@ func run() int {
 	cfg, err := loadConfig()
 	if err != nil {
 		if jsonOutputMode {
-			outputJSONError(nil, err.Error())
+			outputJSONError(nil, err.Error(), ErrorCodeConfigError)
 		} else {
 			fmt.Fprintf(os.Stderr, "❌ %s\n", err)
 			fmt.Println()
@@ -2193,7 +2247,7 @@ func run() int {
 			}
 		} else {
 			if jsonOutputMode {
-				outputJSONError(&domain, lastErr.Error())
+				outputJSONError(&domain, lastErr.Error(), classifyError(lastErr))
 			} else {
 				fmt.Fprintf(os.Stderr, "❌ %s sorgulanırken hata: %s\n", domain, lastErr)
 			}
