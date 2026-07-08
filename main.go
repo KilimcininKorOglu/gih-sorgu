@@ -839,6 +839,16 @@ func init() {
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12},
 		},
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return fmt.Errorf("too many redirects")
+			}
+			// Strip x-goog-api-key on cross-domain redirects
+			if len(via) > 0 && req.URL.Host != via[len(via)-1].URL.Host {
+				req.Header.Del("x-goog-api-key")
+			}
+			return nil
+		},
 	}
 
 	// Insecure HTTP client for guvenlinet.org.tr (cert chain issues)
