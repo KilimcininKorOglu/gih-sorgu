@@ -2028,10 +2028,9 @@ func run() int {
 		var result *QueryResult
 		var queryDuration time.Duration
 		var lastErr error
+		startTime := time.Now()
 
 		for retry := 0; retry < MaxRetries; retry++ {
-			startTime := time.Now()
-
 			// Get CAPTCHA
 			captchaResult, err := getCaptcha(cfg, sharedSession)
 			if err != nil {
