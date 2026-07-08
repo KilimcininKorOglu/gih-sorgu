@@ -80,6 +80,7 @@ const (
 	MaxRateLimit = 10000
 
 	MaxHTMLBodySize   = 10 * 1024 * 1024
+	SessionTTL        = 5 * time.Minute
 	MaxGeminiBodySize = 1 * 1024 * 1024
 	MaxCaptchaSize    = 500 * 1024
 
@@ -104,6 +105,12 @@ type Config struct {
 	GeminiMaxTokens int
 	UserAgent       string
 	RateLimitDelay  int
+}
+
+// SessionCache holds session cookies with timestamp for TTL tracking
+type SessionCache struct {
+	Cookies    map[string]string
+	LastUpdate time.Time
 }
 
 // QueryResult holds the result of a domain query
@@ -1219,14 +1226,15 @@ func getSessionCookies(cfg *Config) (map[string]string, error) {
 }
 
 // getCaptcha downloads CAPTCHA image
-func getCaptcha(cfg *Config, existingSession map[string]string) (*CaptchaResult, error) {
+func getCaptcha(cfg *Config, existingSession *SessionCache) (*CaptchaResult, error) {
 	session := existingSession
 	var err error
-	if session == nil {
-		session, err = getSessionCookies(cfg)
+	if session == nil || time.Since(session.LastUpdate) > SessionTTL {
+		newCookies, err := getSessionCookies(cfg)
 		if err != nil {
 			return nil, err
 		}
+		session = &SessionCache{Cookies: newCookies, LastUpdate: time.Now()}
 	}
 
 	// Build URL with random parameter
@@ -1248,7 +1256,7 @@ func getCaptcha(cfg *Config, existingSession map[string]string) (*CaptchaResult,
 	req.Header.Set("Referer", BaseURL+RefererPath)
 
 	// Add cookies (CRITICAL: don't add empty Cookie header)
-	cookieStr := cookiesToString(session)
+	cookieStr := cookiesToString(session.Cookies)
 	if cookieStr != "" {
 		req.Header.Set("Cookie", cookieStr)
 	}
@@ -1266,7 +1274,7 @@ func getCaptcha(cfg *Config, existingSession map[string]string) (*CaptchaResult,
 	// Merge cookies
 	newCookies := parseCookies(resp.Cookies())
 	for k, v := range newCookies {
-		session[k] = v
+		session.Cookies[k] = v
 	}
 
 	// Read image data
@@ -1288,7 +1296,7 @@ func getCaptcha(cfg *Config, existingSession map[string]string) (*CaptchaResult,
 	log("✅ CAPTCHA indirildi: %d bytes\n", len(imageData))
 
 	return &CaptchaResult{
-		Cookies:     session,
+		Cookies:     session.Cookies,
 		ImageBuffer: imageData,
 	}, nil
 }
@@ -1899,7 +1907,7 @@ func run() int {
 
 	// Query domains
 	var results []*QueryResult
-	var sharedSession map[string]string
+	var sharedSession *SessionCache
 	lastExitCode := ExitSuccess
 	consecutiveGeminiFailures := 0
 	const maxConsecutiveGeminiFailures = 5
@@ -1933,7 +1941,7 @@ func run() int {
 				}
 				continue
 			}
-			sharedSession = captchaResult.Cookies
+			sharedSession = &SessionCache{Cookies: captchaResult.Cookies, LastUpdate: time.Now()}
 
 			// Solve CAPTCHA
 			captchaCode, err := solveCaptchaWithGemini(captchaResult.ImageBuffer, cfg)
@@ -1956,7 +1964,7 @@ func run() int {
 			}
 
 			// Query domain
-			html, err := sorgulaSite(domain, captchaCode, captchaResult.Cookies, cfg)
+			html, err := sorgulaSite(domain, captchaCode, sharedSession.Cookies, cfg)
 			if err != nil {
 				lastErr = err
 				fmt.Fprintf(os.Stderr, "❌ Sorgu hatası: %s\n", err)
