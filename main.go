@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -356,6 +357,31 @@ func saveHistory(items []HistoryItem) error {
 		return err
 	}
 	return os.Rename(tmpFile, historyFileName)
+}
+
+// translateNetworkError classifies common network errors and returns a user-friendly Turkish message.
+func translateNetworkError(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return "istek zaman aşımına uğradı, daha sonra tekrar deneyin"
+	}
+
+	errStr := err.Error()
+	if strings.Contains(errStr, "no such host") || strings.Contains(errStr, "lookup ") {
+		return "sunucuya ulaşılamıyor, internet bağlantınızı kontrol edin"
+	}
+	if strings.Contains(errStr, "connection refused") {
+		return "sunucu bağlantıyı reddetti, daha sonra tekrar deneyin"
+	}
+	if strings.Contains(errStr, "connection reset") {
+		return "bağlantı sıfırlandı, daha sonra tekrar deneyin"
+	}
+
+	return err.Error()
 }
 
 // upsertHistory adds or updates a domain in history (unique by domain, moves to end on update)
@@ -1134,7 +1160,7 @@ func getSessionCookies(cfg *Config) (map[string]string, error) {
 
 	resp, err := insecureClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("oturum isteği başarısız: %w", err)
+		return nil, fmt.Errorf("oturum isteği başarısız: %s", translateNetworkError(err))
 	}
 	defer func() {
 		io.Copy(io.Discard, resp.Body)
@@ -1188,7 +1214,7 @@ func getCaptcha(cfg *Config, existingSession map[string]string) (*CaptchaResult,
 
 	resp, err := insecureClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("CAPTCHA indirme başarısız: %w", err)
+		return nil, fmt.Errorf("CAPTCHA indirme başarısız: %s", translateNetworkError(err))
 	}
 	defer resp.Body.Close()
 
@@ -1275,7 +1301,7 @@ func solveCaptchaWithGemini(imageBuffer []byte, cfg *Config) (string, error) {
 
 	resp, err := secureClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("Gemini API isteği başarısız: %w", err)
+		return "", fmt.Errorf("Gemini API isteği başarısız: %s", translateNetworkError(err))
 	}
 	defer resp.Body.Close()
 
@@ -1372,7 +1398,7 @@ func sorgulaSite(domain, captchaCode string, cookies map[string]string, cfg *Con
 
 	resp, err := insecureClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("sorgu başarısız: %w", err)
+		return "", fmt.Errorf("sorgu başarısız: %s", translateNetworkError(err))
 	}
 	defer resp.Body.Close()
 
