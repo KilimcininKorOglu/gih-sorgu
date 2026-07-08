@@ -75,6 +75,10 @@ const (
 	MaxTokensCap = 8192
 	MaxRateLimit = 10000
 
+	MaxHTMLBodySize   = 10 * 1024 * 1024
+	MaxGeminiBodySize = 1 * 1024 * 1024
+	MaxCaptchaSize    = 500 * 1024
+
 	BaseURL     = "https://www.guvenlinet.org.tr"
 	SorguPath   = "/ajax/sorgu/sorgula.php"
 	CaptchaPath = "/captcha/get_captcha.php"
@@ -1094,18 +1098,18 @@ func decompressResponse(body io.ReadCloser, encoding string) ([]byte, error) {
 
 	switch encoding {
 	case "gzip":
-		reader, err := gzip.NewReader(body)
+		reader, err := gzip.NewReader(io.LimitReader(body, MaxHTMLBodySize))
 		if err != nil {
 			return nil, err
 		}
 		defer reader.Close()
 		return io.ReadAll(reader)
 	case "deflate":
-		reader := flate.NewReader(body)
+		reader := flate.NewReader(io.LimitReader(body, MaxHTMLBodySize))
 		defer reader.Close()
 		return io.ReadAll(reader)
 	default:
-		return io.ReadAll(body)
+		return io.ReadAll(io.LimitReader(body, MaxHTMLBodySize))
 	}
 }
 
@@ -1194,7 +1198,7 @@ func getCaptcha(cfg *Config, existingSession map[string]string) (*CaptchaResult,
 	}
 
 	// Read image data
-	imageData, err := io.ReadAll(resp.Body)
+	imageData, err := io.ReadAll(io.LimitReader(resp.Body, MaxCaptchaSize))
 	if err != nil {
 		return nil, err
 	}
@@ -1270,7 +1274,7 @@ func solveCaptchaWithGemini(imageBuffer []byte, cfg *Config) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, MaxGeminiBodySize))
 
 	if resp.StatusCode != 200 {
 		var geminiErr GeminiError
