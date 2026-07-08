@@ -1168,7 +1168,7 @@ func setDefaultHeaders(req *http.Request, cfg *Config) {
 func decompressResponse(body io.ReadCloser, encoding string) ([]byte, error) {
 	defer body.Close()
 
-	switch encoding {
+	switch strings.ToLower(encoding) {
 	case "gzip":
 		reader, err := gzip.NewReader(io.LimitReader(body, MaxHTMLBodySize))
 		if err != nil {
