@@ -1462,8 +1462,7 @@ func isCaptchaError(html string) bool {
 	return strings.Contains(html, "Güvenlik kodu hatalı") ||
 		strings.Contains(html, "security code") ||
 		strings.Contains(html, "Doğrulama kodu") ||
-		strings.Contains(html, "Hatalı kod") ||
-		(len(strings.TrimSpace(html)) < 50 && !strings.Contains(html, "tbl_sorgu"))
+		strings.Contains(html, "Hatalı kod")
 }
 
 // ============================================================================

@@ -198,8 +198,8 @@ func TestIsCaptchaError(t *testing.T) {
 	if !isCaptchaError("Güvenlik kodu hatalı") {
 		t.Fatalf("expected Turkish CAPTCHA error to be detected")
 	}
-	if !isCaptchaError("short") {
-		t.Fatalf("expected short non-result response to be detected")
+	if isCaptchaError("short") {
+		t.Fatalf("did not expect short response to be detected as CAPTCHA error")
 	}
 	if isCaptchaError(`<table id="tbl_sorgu"><tr><td>ok</td></tr></table>`) {
 		t.Fatalf("did not expect result table to be detected as CAPTCHA error")
