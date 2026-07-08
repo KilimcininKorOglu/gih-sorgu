@@ -594,14 +594,19 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch msg.String() {
-		case "ctrl+c", "esc":
-			if m.state == stateResult || m.state == stateError {
-				// Go back to input
+		case "esc":
+			if m.state == stateResult || m.state == stateError || m.state == stateQuerying {
+				// Go back to input (cancel in-progress query if querying)
 				m.state = stateInput
+				m.currentQuery = ""
 				m.textInput.SetValue("")
 				m.textInput.Focus()
 				return m, textinput.Blink
 			}
+			m.quitting = true
+			return m, tea.Quit
+
+		case "ctrl+c":
 			m.quitting = true
 			return m, tea.Quit
 
@@ -660,6 +665,11 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 
 	case QueryMsg:
+		// Ignore results from a cancelled query
+		if m.currentQuery == "" {
+			return m, nil
+		}
+
 		if msg.Error != nil {
 			m.errorMsg = msg.Error.Error()
 			m.state = stateError
@@ -834,7 +844,8 @@ func (m TUIModel) View() string {
 		s.WriteString(" ")
 		s.WriteString(statusStyle.Render(fmt.Sprintf("⏳ %s sorgulanıyor...", m.currentQuery)))
 		s.WriteString("\n\n")
-		s.WriteString(" Lütfen bekleyin...")
+		s.WriteString(" Lütfen bekleyin...\n")
+		s.WriteString(" esc: iptal • ctrl+c: çıkış")
 
 	case stateResult:
 		s.WriteString(m.renderResult())
