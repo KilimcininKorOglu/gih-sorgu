@@ -396,6 +396,15 @@ func calculateRetryDelay(retry int) time.Duration {
 	return backoff + jitter
 }
 
+// isPermanentError checks if an error is non-retriable (auth failures, etc.).
+func isPermanentError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	return strings.Contains(errStr, "yetkilendirme hatası") || strings.Contains(errStr, "authorization")
+}
+
 // upsertHistory adds or updates a domain in history (unique by domain, moves to end on update)
 func upsertHistory(items []HistoryItem, newItem HistoryItem) []HistoryItem {
 	// Find existing domain (case-insensitive)
@@ -613,6 +622,9 @@ func (m TUIModel) queryDomain(domain string) tea.Cmd {
 			captchaCode, err := solveCaptchaWithGemini(captchaResult.ImageBuffer, m.config)
 			if err != nil {
 				lastErr = err
+				if isPermanentError(err) {
+					break
+				}
 				if retry < MaxRetries-1 {
 					delay := RetryDelay
 					var rae *RetryAfterError
@@ -1895,6 +1907,9 @@ func run() int {
 			if err != nil {
 				lastErr = err
 				fmt.Fprintf(os.Stderr, "❌ CAPTCHA çözülemedi: %s\n", err)
+				if isPermanentError(err) {
+					break
+				}
 				if retry < MaxRetries-1 {
 					delay := RetryDelay
 					var rae *RetryAfterError
