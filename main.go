@@ -845,14 +845,18 @@ func init() {
 
 // log prints message only in non-JSON mode
 func log(format string, args ...interface{}) {
-	if !jsonOutputMode {
+	if jsonOutputMode {
+		fmt.Fprintf(os.Stderr, format, args...)
+	} else {
 		fmt.Printf(format, args...)
 	}
 }
 
-// logln prints message with newline only in non-JSON mode
+// logln prints message with newline
 func logln(msg string) {
-	if !jsonOutputMode {
+	if jsonOutputMode {
+		fmt.Fprintln(os.Stderr, msg)
+	} else {
 		fmt.Println(msg)
 	}
 }
@@ -1864,9 +1868,7 @@ func run() int {
 			captchaResult, err := getCaptcha(cfg, sharedSession)
 			if err != nil {
 				lastErr = err
-				if !jsonOutputMode {
-					fmt.Fprintf(os.Stderr, "❌ CAPTCHA hatası: %s\n", err)
-				}
+				fmt.Fprintf(os.Stderr, "❌ CAPTCHA hatası: %s\n", err)
 				sharedSession = nil
 				if retry < MaxRetries-1 {
 					logln("🔄 Yeniden deneniyor...")
@@ -1880,9 +1882,7 @@ func run() int {
 			captchaCode, err := solveCaptchaWithGemini(captchaResult.ImageBuffer, cfg)
 			if err != nil {
 				lastErr = err
-				if !jsonOutputMode {
-					fmt.Fprintf(os.Stderr, "❌ CAPTCHA çözülemedi: %s\n", err)
-				}
+				fmt.Fprintf(os.Stderr, "❌ CAPTCHA çözülemedi: %s\n", err)
 				if retry < MaxRetries-1 {
 					delay := RetryDelay
 					var rae *RetryAfterError
@@ -1899,9 +1899,7 @@ func run() int {
 			html, err := sorgulaSite(domain, captchaCode, captchaResult.Cookies, cfg)
 			if err != nil {
 				lastErr = err
-				if !jsonOutputMode {
-					fmt.Fprintf(os.Stderr, "❌ Sorgu hatası: %s\n", err)
-				}
+				fmt.Fprintf(os.Stderr, "❌ Sorgu hatası: %s\n", err)
 				sharedSession = nil
 				if retry < MaxRetries-1 {
 					logln("🔄 Yeniden deneniyor...")
@@ -1948,9 +1946,7 @@ func run() int {
 				lastExitCode = ExitAPIError
 				consecutiveGeminiFailures++
 				if consecutiveGeminiFailures >= maxConsecutiveGeminiFailures {
-					if !jsonOutputMode {
-						fmt.Fprintf(os.Stderr, "\n⛔ Gemini API art arda %d kez başarısız oldu, toplu sorgu durduruldu.\n", consecutiveGeminiFailures)
-					}
+					fmt.Fprintf(os.Stderr, "\n⛔ Gemini API art arda %d kez başarısız oldu, toplu sorgu durduruldu.\n", consecutiveGeminiFailures)
 					lastExitCode = ExitAPIError
 					break
 				}
