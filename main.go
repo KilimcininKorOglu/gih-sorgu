@@ -199,7 +199,10 @@ type GeminiPromptFeedback struct {
 
 type GeminiError struct {
 	Error struct {
-		Message string `json:"message"`
+		Code    int               `json:"code"`
+		Message string            `json:"message"`
+		Status  string            `json:"status"`
+		Details []json.RawMessage `json:"details"`
 	} `json:"error"`
 }
 
@@ -1524,7 +1527,7 @@ func solveCaptchaWithGemini(imageBuffer []byte, cfg *Config) (string, error) {
 
 		switch resp.StatusCode {
 		case 429:
-			inner := fmt.Errorf("Gemini API kota aşıldı: %s", geminiErr.Error.Message)
+			inner := fmt.Errorf("Gemini API kota aşıldı: HTTP %d [%s]: %s", resp.StatusCode, geminiErr.Error.Status, geminiErr.Error.Message)
 			if ra := resp.Header.Get("Retry-After"); ra != "" {
 				if secs, err := strconv.Atoi(ra); err == nil && secs > 0 {
 					return "", &RetryAfterError{Inner: inner, RetryAfter: time.Duration(secs) * time.Second}
@@ -1532,9 +1535,9 @@ func solveCaptchaWithGemini(imageBuffer []byte, cfg *Config) (string, error) {
 			}
 			return "", inner
 		case 401, 403:
-			return "", fmt.Errorf("Gemini API yetkilendirme hatası: %s", geminiErr.Error.Message)
+			return "", fmt.Errorf("Gemini API yetkilendirme hatası: HTTP %d [%s]: %s", resp.StatusCode, geminiErr.Error.Status, geminiErr.Error.Message)
 		default:
-			return "", fmt.Errorf("Gemini API hatası: HTTP %d - %s", resp.StatusCode, geminiErr.Error.Message)
+			return "", fmt.Errorf("Gemini API hatası: HTTP %d [%s]: %s", resp.StatusCode, geminiErr.Error.Status, geminiErr.Error.Message)
 		}
 	}
 
