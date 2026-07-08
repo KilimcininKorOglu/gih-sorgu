@@ -1134,7 +1134,7 @@ func getSessionCookies(cfg *Config) (map[string]string, error) {
 
 	resp, err := insecureClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("session request failed: %w", err)
+		return nil, fmt.Errorf("oturum isteği başarısız: %w", err)
 	}
 	defer func() {
 		io.Copy(io.Discard, resp.Body)
@@ -1142,7 +1142,7 @@ func getSessionCookies(cfg *Config) (map[string]string, error) {
 	}()
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("session failed: HTTP %d", resp.StatusCode)
+		return nil, fmt.Errorf("oturum başarısız: HTTP %d", resp.StatusCode)
 	}
 
 	cookies := parseCookies(resp.Cookies())
@@ -1188,12 +1188,12 @@ func getCaptcha(cfg *Config, existingSession map[string]string) (*CaptchaResult,
 
 	resp, err := insecureClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("CAPTCHA download failed: %w", err)
+		return nil, fmt.Errorf("CAPTCHA indirme başarısız: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("CAPTCHA download failed: HTTP %d", resp.StatusCode)
+		return nil, fmt.Errorf("CAPTCHA indirme başarısız: HTTP %d", resp.StatusCode)
 	}
 
 	// Merge cookies
@@ -1213,9 +1213,9 @@ func getCaptcha(cfg *Config, existingSession map[string]string) (*CaptchaResult,
 		// Check for WAF block
 		preview := string(imageData[:minInt(100, len(imageData))])
 		if strings.Contains(preview, "Request Rejected") {
-			return nil, fmt.Errorf("CAPTCHA request blocked by WAF - cookie issue")
+			return nil, fmt.Errorf("CAPTCHA isteği WAF tarafından engellendi - cookie sorunu")
 		}
-		return nil, fmt.Errorf("invalid CAPTCHA response: not a JPEG")
+		return nil, fmt.Errorf("geçersiz CAPTCHA yanıtı: JPEG değil")
 	}
 
 	log("✅ CAPTCHA indirildi: %d bytes\n", len(imageData))
@@ -1275,7 +1275,7 @@ func solveCaptchaWithGemini(imageBuffer []byte, cfg *Config) (string, error) {
 
 	resp, err := secureClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("Gemini API request failed: %w", err)
+		return "", fmt.Errorf("Gemini API isteği başarısız: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -1303,7 +1303,7 @@ func solveCaptchaWithGemini(imageBuffer []byte, cfg *Config) (string, error) {
 
 	var geminiResp GeminiResponse
 	if err := json.Unmarshal(body, &geminiResp); err != nil {
-		return "", fmt.Errorf("failed to parse Gemini response: %w", err)
+		return "", fmt.Errorf("Gemini yanıtı ayrıştırılamadı: %w", err)
 	}
 
 	// Check for safety filter
@@ -1372,12 +1372,12 @@ func sorgulaSite(domain, captchaCode string, cookies map[string]string, cfg *Con
 
 	resp, err := insecureClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("query failed: %w", err)
+		return "", fmt.Errorf("sorgu başarısız: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("query failed: HTTP %d", resp.StatusCode)
+		return "", fmt.Errorf("sorgu başarısız: HTTP %d", resp.StatusCode)
 	}
 
 	// Decompress response
