@@ -1849,6 +1849,8 @@ func run() int {
 	var results []*QueryResult
 	var sharedSession map[string]string
 	lastExitCode := ExitSuccess
+	consecutiveGeminiFailures := 0
+	const maxConsecutiveGeminiFailures = 5
 
 	for i, domain := range validDomains {
 		var result *QueryResult
@@ -1944,9 +1946,22 @@ func run() int {
 			errMsg := lastErr.Error()
 			if strings.Contains(errMsg, "Gemini API") {
 				lastExitCode = ExitAPIError
+				consecutiveGeminiFailures++
+				if consecutiveGeminiFailures >= maxConsecutiveGeminiFailures {
+					if !jsonOutputMode {
+						fmt.Fprintf(os.Stderr, "\n⛔ Gemini API art arda %d kez başarısız oldu, toplu sorgu durduruldu.\n", consecutiveGeminiFailures)
+					}
+					lastExitCode = ExitAPIError
+					break
+				}
 			} else {
 				lastExitCode = ExitNetworkError
 			}
+		}
+
+		// Reset circuit breaker on success
+		if result != nil {
+			consecutiveGeminiFailures = 0
 		}
 
 		// Rate limiting
