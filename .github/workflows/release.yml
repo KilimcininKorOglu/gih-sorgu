@@ -27,6 +27,12 @@ jobs:
       - name: Get dependencies
         run: go mod tidy
 
+      - name: Lint
+        run: make lint
+
+      - name: Test
+        run: make test
+
       - name: Calculate next version
         id: version
         run: |
