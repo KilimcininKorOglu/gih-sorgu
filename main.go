@@ -826,8 +826,8 @@ func init() {
 			if len(via) >= 5 {
 				return fmt.Errorf("too many redirects")
 			}
-			// Preserve cookies across redirects
-			if len(via) > 0 {
+			// Preserve cookies across redirects only for same host
+			if len(via) > 0 && req.URL.Host == via[len(via)-1].URL.Host {
 				for key, val := range via[len(via)-1].Header {
 					if key == "Cookie" {
 						req.Header[key] = val
