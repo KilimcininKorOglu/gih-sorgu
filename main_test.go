@@ -114,6 +114,7 @@ func TestLoadEnvFileAt(t *testing.T) {
 		"GIH_TEST_API_KEY=from-file",
 		"GIH_TEST_QUOTED=\"quoted value\"",
 		"GIH_TEST_EXISTING=from-file",
+		"export GIH_TEST_EXPORT=export-value",
 		"malformed",
 		"",
 	}, "\n")
@@ -125,6 +126,7 @@ func TestLoadEnvFileAt(t *testing.T) {
 	t.Setenv("GIH_TEST_API_KEY", "")
 	t.Setenv("GIH_TEST_QUOTED", "")
 	t.Setenv("GIH_TEST_EXISTING", "from-system")
+	t.Setenv("GIH_TEST_EXPORT", "")
 
 	if err := loadEnvFileAt(envPath); err != nil {
 		t.Fatalf("loadEnvFileAt returned error: %v", err)
@@ -138,6 +140,9 @@ func TestLoadEnvFileAt(t *testing.T) {
 	}
 	if got := os.Getenv("GIH_TEST_EXISTING"); got != "from-system" {
 		t.Fatalf("GIH_TEST_EXISTING = %q, want from-system", got)
+	}
+	if got := os.Getenv("GIH_TEST_EXPORT"); got != "export-value" {
+		t.Fatalf("GIH_TEST_EXPORT = %q, want export-value", got)
 	}
 }
 

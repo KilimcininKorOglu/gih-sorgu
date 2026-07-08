@@ -1043,6 +1043,10 @@ func loadEnvFileAt(envPath string) error {
 		key := strings.TrimSpace(line[:idx])
 		value := strings.TrimSpace(line[idx+1:])
 
+		// Strip optional `export ` prefix commonly used in shell dotenv files
+		key = strings.TrimPrefix(key, "export ")
+		key = strings.TrimSpace(key)
+
 		// Remove surrounding quotes
 		if len(value) >= 2 {
 			if (value[0] == '"' && value[len(value)-1] == '"') ||
