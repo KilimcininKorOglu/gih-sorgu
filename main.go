@@ -38,7 +38,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-	"unicode"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -1146,6 +1145,16 @@ func loadConfig() (*Config, error) {
 // DOMAIN VALIDATION
 // ============================================================================
 
+// isASCIILetter reports whether r is an ASCII letter.
+func isASCIILetter(r rune) bool {
+	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
+}
+
+// isASCIIDigit reports whether r is an ASCII digit.
+func isASCIIDigit(r rune) bool {
+	return r >= '0' && r <= '9'
+}
+
 // isValidDomain checks if a domain name is valid
 func isValidDomain(domain string) bool {
 	if domain == "" {
@@ -1176,9 +1185,9 @@ func isValidDomain(domain string) bool {
 			return false
 		}
 
-		// Only alphanumeric and hyphen allowed
+		// Only ASCII alphanumeric and hyphen allowed
 		for _, r := range label {
-			if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '-' {
+			if !isASCIILetter(r) && !isASCIIDigit(r) && r != '-' {
 				return false
 			}
 		}
@@ -1190,10 +1199,10 @@ func isValidDomain(domain string) bool {
 		return false
 	}
 
-	// TLD must be letters only (unless punycode xn--)
+	// TLD must be ASCII letters only (unless punycode xn--)
 	if !strings.HasPrefix(tld, "xn--") {
 		for _, r := range tld {
-			if !unicode.IsLetter(r) {
+			if !isASCIILetter(r) {
 				return false
 			}
 		}

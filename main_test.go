@@ -30,6 +30,8 @@ func TestIsValidDomain(t *testing.T) {
 		{name: "underscore", domain: "bad_domain.com", want: false},
 		{name: "empty label", domain: "example..com", want: false},
 		{name: "too long label", domain: strings.Repeat("a", 64) + ".com", want: false},
+		{name: "turkish chars", domain: "çalışma.com", want: false},
+		{name: "german umlaut", domain: "münchen.de", want: false},
 	}
 
 	for _, tt := range tests {
