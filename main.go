@@ -80,6 +80,8 @@ const (
 	MaxGeminiBodySize = 1 * 1024 * 1024
 	MaxCaptchaSize    = 500 * 1024
 
+	MaxRetryDelay = 30 * time.Second
+
 	BaseURL     = "https://www.guvenlinet.org.tr"
 	SorguPath   = "/ajax/sorgu/sorgula.php"
 	CaptchaPath = "/captcha/get_captcha.php"
@@ -384,6 +386,16 @@ func translateNetworkError(err error) string {
 	return err.Error()
 }
 
+// calculateRetryDelay returns exponential backoff with jitter for retry attempts.
+func calculateRetryDelay(retry int) time.Duration {
+	backoff := RetryDelay * time.Duration(1<<uint(retry))
+	if backoff > MaxRetryDelay {
+		backoff = MaxRetryDelay
+	}
+	jitter := time.Duration(rand.Int63n(int64(backoff) / 5))
+	return backoff + jitter
+}
+
 // upsertHistory adds or updates a domain in history (unique by domain, moves to end on update)
 func upsertHistory(items []HistoryItem, newItem HistoryItem) []HistoryItem {
 	// Find existing domain (case-insensitive)
@@ -592,7 +604,7 @@ func (m TUIModel) queryDomain(domain string) tea.Cmd {
 			if err != nil {
 				lastErr = err
 				if retry < MaxRetries-1 {
-					time.Sleep(RetryDelay)
+					time.Sleep(calculateRetryDelay(retry))
 				}
 				continue
 			}
@@ -617,7 +629,7 @@ func (m TUIModel) queryDomain(domain string) tea.Cmd {
 			if err != nil {
 				lastErr = err
 				if retry < MaxRetries-1 {
-					time.Sleep(RetryDelay)
+					time.Sleep(calculateRetryDelay(retry))
 				}
 				continue
 			}
@@ -626,7 +638,7 @@ func (m TUIModel) queryDomain(domain string) tea.Cmd {
 			if isCaptchaError(html) {
 				lastErr = fmt.Errorf("CAPTCHA kodu hatalı")
 				if retry < MaxRetries-1 {
-					time.Sleep(RetryDelay)
+					time.Sleep(calculateRetryDelay(retry))
 				}
 				continue
 			}
@@ -1872,7 +1884,7 @@ func run() int {
 				sharedSession = nil
 				if retry < MaxRetries-1 {
 					logln("🔄 Yeniden deneniyor...")
-					time.Sleep(RetryDelay)
+					time.Sleep(calculateRetryDelay(retry))
 				}
 				continue
 			}
@@ -1903,7 +1915,7 @@ func run() int {
 				sharedSession = nil
 				if retry < MaxRetries-1 {
 					logln("🔄 Yeniden deneniyor...")
-					time.Sleep(RetryDelay)
+					time.Sleep(calculateRetryDelay(retry))
 				}
 				continue
 			}
@@ -1915,7 +1927,7 @@ func run() int {
 				sharedSession = nil
 				if retry < MaxRetries-1 {
 					log("🔄 Yeni CAPTCHA ile deneniyor (%d/%d)...\n", retry+1, MaxRetries)
-					time.Sleep(RetryDelay)
+					time.Sleep(calculateRetryDelay(retry))
 				}
 				continue
 			}
