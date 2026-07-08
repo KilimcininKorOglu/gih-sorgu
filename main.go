@@ -91,7 +91,7 @@ const (
 	CaptchaPath = "/captcha/get_captcha.php"
 	RefererPath = "/sorgula"
 
-	GeminiPrompt = `Read the CAPTCHA text. Reply with ONLY the characters (letters and numbers), nothing else. The CAPTCHA is usually 6 characters.`
+	GeminiPrompt = `Read the CAPTCHA text. Reply with ONLY the characters (letters and numbers), preserving uppercase and lowercase exactly as shown. The CAPTCHA is usually 6 characters.`
 )
 
 // ============================================================================
@@ -1510,11 +1510,11 @@ func solveCaptchaWithGemini(imageBuffer []byte, cfg *Config) (string, error) {
 		return "", fmt.Errorf("Gemini API metin yanıtı vermedi")
 	}
 
-	// Clean CAPTCHA code - only alphanumeric, lowercase
+	// Clean CAPTCHA code - only alphanumeric, preserve original case
 	text := candidate.Content.Parts[0].Text
 	var captchaCode strings.Builder
-	for _, r := range strings.ToLower(text) {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+	for _, r := range text {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
 			captchaCode.WriteRune(r)
 		}
 	}
