@@ -316,6 +316,7 @@ func loadHistory() []HistoryItem {
 
 	var hf HistoryFile
 	if err := json.Unmarshal(data, &hf); err != nil {
+		fmt.Fprintf(os.Stderr, "⚠️ history.json bozuk, geçmiş silindi: %s\n", err)
 		return []HistoryItem{}
 	}
 
@@ -350,7 +351,11 @@ func saveHistory(items []HistoryItem) error {
 		return err
 	}
 
-	return os.WriteFile(historyFileName, data, 0644)
+	tmpFile := historyFileName + ".tmp"
+	if err := os.WriteFile(tmpFile, data, 0644); err != nil {
+		return err
+	}
+	return os.Rename(tmpFile, historyFileName)
 }
 
 // upsertHistory adds or updates a domain in history (unique by domain, moves to end on update)
