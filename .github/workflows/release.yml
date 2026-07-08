@@ -65,8 +65,26 @@ jobs:
           name: gih-sorgu-binaries-${{ github.sha }}
           path: dist/
 
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Extract CHANGELOG entry
+        id: changelog
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "Extracting CHANGELOG entry for version $VERSION"
+          awk -v ver="[$VERSION]" '
+            $0 == ver { in_section=1; print; next }
+            in_section && /^## / { exit }
+            in_section { print }
+          ' CHANGELOG.md > changelog_entry.md
+          cat changelog_entry.md
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*
-          generate_release_notes: true
+          body_path: changelog_entry.md
