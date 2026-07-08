@@ -330,6 +330,42 @@ func TestCookiesToString(t *testing.T) {
 	}
 }
 
+func TestBatchProgress(t *testing.T) {
+	dir := t.TempDir()
+	progressFile := filepath.Join(dir, "progress.json")
+
+	bp := &BatchProgress{
+		Domains: []string{"example.com", "test.com"},
+		Results: []*QueryResult{
+			{Domain: "example.com", EngelliMi: false, Parsed: true, AileProfili: "erisim", CocukProfili: "erisim"},
+			{Domain: "test.com", EngelliMi: true, Parsed: true, AileProfili: "engelli", CocukProfili: "engelli"},
+		},
+	}
+
+	if err := saveBatchProgress(progressFile, bp); err != nil {
+		t.Fatalf("saveBatchProgress error: %v", err)
+	}
+
+	loaded, err := loadBatchProgress(progressFile)
+	if err != nil {
+		t.Fatalf("loadBatchProgress error: %v", err)
+	}
+
+	if len(loaded.Domains) != 2 || loaded.Domains[0] != "example.com" {
+		t.Fatalf("domains mismatch: %v", loaded.Domains)
+	}
+	if len(loaded.Results) != 2 || loaded.Results[0].Domain != "example.com" {
+		t.Fatalf("results mismatch: %v", loaded.Results)
+	}
+
+	if progressFileName("sites.txt") != "sites.txt.progress.json" {
+		t.Fatalf("unexpected progress file name: %s", progressFileName("sites.txt"))
+	}
+	if progressFileName("") != "gih-sorgu-progress.json" {
+		t.Fatalf("unexpected default progress file name: %s", progressFileName(""))
+	}
+}
+
 func TestDecompressResponse(t *testing.T) {
 	t.Run("gzip", func(t *testing.T) {
 		var buf bytes.Buffer

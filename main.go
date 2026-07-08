@@ -135,9 +135,17 @@ type CLIArgs struct {
 	Domains     []string
 	ListFile    string
 	JSONOutput  bool
+	Resume      bool
 	ShowHelp    bool
 	ShowVersion bool
 	Error       string
+}
+
+// BatchProgress holds checkpoint data for batch resume
+type BatchProgress struct {
+	Domains []string       `json:"domains"`
+	Results []*QueryResult `json:"results"`
+	Updated time.Time      `json:"updated"`
 }
 
 // Gemini API types
@@ -395,6 +403,41 @@ func saveHistory(items []HistoryItem) error {
 		return err
 	}
 	return os.Rename(tmpFile, historyFileName)
+}
+
+// loadBatchProgress reads the checkpoint file for batch resume
+func loadBatchProgress(filename string) (*BatchProgress, error) {
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	var bp BatchProgress
+	if err := json.Unmarshal(data, &bp); err != nil {
+		return nil, err
+	}
+	return &bp, nil
+}
+
+// saveBatchProgress writes checkpoint data to a temp file and renames it
+func saveBatchProgress(filename string, bp *BatchProgress) error {
+	bp.Updated = time.Now()
+	data, err := json.MarshalIndent(bp, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmpFile := filename + ".tmp"
+	if err := os.WriteFile(tmpFile, data, 0600); err != nil {
+		return err
+	}
+	return os.Rename(tmpFile, filename)
+}
+
+// progressFileName derives a checkpoint filename from the list file name
+func progressFileName(listFile string) string {
+	if listFile == "" {
+		return "gih-sorgu-progress.json"
+	}
+	return listFile + ".progress.json"
 }
 
 // translateNetworkError classifies common network errors and returns a user-friendly Turkish message.
@@ -1690,6 +1733,8 @@ func parseArgs() *CLIArgs {
 			args.ShowVersion = true
 		case "--json":
 			args.JSONOutput = true
+		case "--resume":
+			args.Resume = true
 		case "--liste":
 			if i+1 < len(osArgs) {
 				args.ListFile = osArgs[i+1]
@@ -1743,6 +1788,7 @@ Kullanım:
 
 Seçenekler:
   --liste <dosya>     Dosyadan site listesi oku
+  --resume            Önceki --liste çalıştırmasından devam et
   --json              JSON formatında çıktı
   --version, -v       Versiyon bilgisini göster
   --help, -h          Bu yardım mesajını göster
@@ -1759,6 +1805,7 @@ TUI Modu:
   gih-sorgu discord.com                 # Tek domain
   gih-sorgu discord.com twitter.com     # Çoklu domain
   gih-sorgu --liste sites.txt           # Dosyadan
+  gih-sorgu --liste sites.txt --resume  # Kaldığı yerden devam et
   gih-sorgu --json twitter.com          # JSON çıktı
 
 Ortam Değişkenleri (.env dosyası veya sistem ortamı):
@@ -1887,6 +1934,36 @@ func run() int {
 			fmt.Fprintln(os.Stderr, "❌ Geçerli domain bulunamadı!")
 		}
 		return ExitInvalidArgs
+	}
+
+	// Load checkpoint for resume
+	progressFile := progressFileName(args.ListFile)
+	var progress *BatchProgress
+	if args.Resume {
+		loaded, err := loadBatchProgress(progressFile)
+		if err == nil {
+			progress = loaded
+			completed := make(map[string]bool, len(progress.Domains))
+			for _, d := range progress.Domains {
+				completed[d] = true
+			}
+			var remaining []string
+			for _, d := range validDomains {
+				if !completed[d] {
+					remaining = append(remaining, d)
+				}
+			}
+			if !jsonOutputMode {
+				fmt.Fprintf(os.Stderr, "📂 Resume: %d/%d domain önceden tamamlanmış, %d kaldı\n", len(progress.Domains), len(validDomains), len(remaining))
+			}
+			validDomains = remaining
+		}
+	}
+	if progress == nil {
+		progress = &BatchProgress{
+			Domains: make([]string, 0, len(validDomains)),
+			Results: make([]*QueryResult, 0, len(validDomains)),
+		}
 	}
 
 	// Load config
@@ -2024,6 +2101,11 @@ func run() int {
 		// Handle result
 		if result != nil {
 			results = append(results, result)
+			progress.Domains = append(progress.Domains, domain)
+			progress.Results = append(progress.Results, result)
+			if err := saveBatchProgress(progressFile, progress); err != nil {
+				logln("⚠️ İlerleme kaydedilemedi")
+			}
 			if jsonOutputMode {
 				outputJSON(result, queryDuration)
 			} else {
