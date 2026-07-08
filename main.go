@@ -1036,7 +1036,7 @@ func loadConfig() (*Config, error) {
 			cfg.RateLimitDelay = clamp(val, 0, MaxRateLimit)
 		}
 	}
-	if cfg.RateLimitDelay == 0 && os.Getenv("RATE_LIMIT_DELAY") == "" {
+	if cfg.RateLimitDelay == 0 {
 		cfg.RateLimitDelay = DefaultRateLimitDelay
 	}
 
