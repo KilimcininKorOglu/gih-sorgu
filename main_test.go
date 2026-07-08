@@ -309,21 +309,21 @@ func TestParseCookies(t *testing.T) {
 	}
 
 	got := parseCookies(cookies)
-	if got["session"] != "abc123" {
-		t.Fatalf("session = %q, want abc123", got["session"])
+	if got["session"] == nil || got["session"].Value != "abc123" {
+		t.Fatalf("session = %v, want abc123", got["session"])
 	}
-	if got["user"] != "john" {
-		t.Fatalf("user = %q, want john", got["user"])
+	if got["user"] == nil || got["user"].Value != "john" {
+		t.Fatalf("user = %v, want john", got["user"])
 	}
-	if got["token"] != "xyz" {
-		t.Fatalf("token = %q, want xyz", got["token"])
+	if got["token"] == nil || got["token"].Value != "xyz" {
+		t.Fatalf("token = %v, want xyz", got["token"])
 	}
 }
 
 func TestCookiesToString(t *testing.T) {
-	cookies := map[string]string{
-		"session": "abc123",
-		"user":    "john",
+	cookies := map[string]*http.Cookie{
+		"session": {Name: "session", Value: "abc123"},
+		"user":    {Name: "user", Value: "john"},
 	}
 
 	got := cookiesToString(cookies)
@@ -332,6 +332,32 @@ func TestCookiesToString(t *testing.T) {
 	}
 	if !strings.Contains(got, "user=john") {
 		t.Fatalf("missing user cookie in %q", got)
+	}
+}
+
+func TestMergeCookies(t *testing.T) {
+	existing := map[string]*http.Cookie{
+		"session": {Name: "session", Value: "old"},
+		"legacy":  {Name: "legacy", Value: "keep"},
+	}
+	incoming := []*http.Cookie{
+		{Name: "session", Value: "new"},
+		{Name: "deleted", Value: "", MaxAge: 0},
+		{Name: "expired", Value: "", MaxAge: -1},
+	}
+
+	got := mergeCookies(existing, parseCookies(incoming))
+	if got["session"] == nil || got["session"].Value != "new" {
+		t.Fatalf("session not updated: %v", got["session"])
+	}
+	if got["legacy"] == nil || got["legacy"].Value != "keep" {
+		t.Fatalf("legacy cookie missing: %v", got["legacy"])
+	}
+	if got["deleted"] != nil {
+		t.Fatalf("deleted cookie should be removed: %v", got["deleted"])
+	}
+	if got["expired"] != nil {
+		t.Fatalf("expired cookie should be removed: %v", got["expired"])
 	}
 }
 

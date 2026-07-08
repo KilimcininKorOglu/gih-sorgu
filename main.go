@@ -109,7 +109,7 @@ type Config struct {
 
 // SessionCache holds session cookies with timestamp for TTL tracking
 type SessionCache struct {
-	Cookies    map[string]string
+	Cookies    map[string]*http.Cookie
 	LastUpdate time.Time
 }
 
@@ -126,7 +126,7 @@ type QueryResult struct {
 
 // CaptchaResult holds CAPTCHA download result
 type CaptchaResult struct {
-	Cookies     map[string]string
+	Cookies     map[string]*http.Cookie
 	ImageBuffer []byte
 }
 
@@ -1202,25 +1202,60 @@ func isValidDomain(domain string) bool {
 // COOKIE MANAGEMENT
 // ============================================================================
 
-// parseCookies extracts cookies from http.Cookie slice
-func parseCookies(cookies []*http.Cookie) map[string]string {
-	result := make(map[string]string)
+// parseCookies extracts cookies from http.Cookie slice into a name-indexed map
+func parseCookies(cookies []*http.Cookie) map[string]*http.Cookie {
+	result := make(map[string]*http.Cookie)
 	for _, c := range cookies {
-		result[c.Name] = c.Value
+		result[c.Name] = c
 	}
 	return result
 }
 
-// cookiesToString converts cookie map to header string
-func cookiesToString(cookies map[string]string) string {
+// cookiesToString converts cookie map to header string, skipping nil or deleted cookies
+func cookiesToString(cookies map[string]*http.Cookie) string {
 	if len(cookies) == 0 {
 		return ""
 	}
 	parts := make([]string, 0, len(cookies))
-	for k, v := range cookies {
-		parts = append(parts, fmt.Sprintf("%s=%s", k, v))
+	for k, c := range cookies {
+		if c == nil || c.Value == "" {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%s=%s", k, c.Value))
 	}
 	return strings.Join(parts, "; ")
+}
+
+// isCookieDeleted reports whether a cookie is a server-initiated deletion
+func isCookieDeleted(c *http.Cookie) bool {
+	if c == nil {
+		return true
+	}
+	if c.MaxAge < 0 {
+		return true
+	}
+	if c.MaxAge == 0 && c.Value == "" {
+		return true
+	}
+	if !c.Expires.IsZero() && c.Expires.Before(time.Now()) {
+		return true
+	}
+	return false
+}
+
+// mergeCookies merges new cookies into an existing cookie map, respecting deletion and expiration
+func mergeCookies(existing, incoming map[string]*http.Cookie) map[string]*http.Cookie {
+	if existing == nil {
+		existing = make(map[string]*http.Cookie)
+	}
+	for k, c := range incoming {
+		if isCookieDeleted(c) {
+			delete(existing, k)
+		} else {
+			existing[k] = c
+		}
+	}
+	return existing
 }
 
 // ============================================================================
@@ -1270,7 +1305,7 @@ func decompressResponse(body io.ReadCloser, encoding string) ([]byte, error) {
 // ============================================================================
 
 // getSessionCookies gets session cookies from main page
-func getSessionCookies(cfg *Config) (map[string]string, error) {
+func getSessionCookies(cfg *Config) (map[string]*http.Cookie, error) {
 	logln("🔗 Session başlatılıyor...")
 
 	req, err := http.NewRequest("GET", BaseURL+RefererPath, nil)
@@ -1346,9 +1381,7 @@ func getCaptcha(cfg *Config, existingSession *SessionCache) (*CaptchaResult, err
 
 	// Merge cookies
 	newCookies := parseCookies(resp.Cookies())
-	for k, v := range newCookies {
-		session.Cookies[k] = v
-	}
+	session.Cookies = mergeCookies(session.Cookies, newCookies)
 
 	// Read image data
 	imageData, err := io.ReadAll(io.LimitReader(resp.Body, MaxCaptchaSize))
@@ -1496,7 +1529,7 @@ func solveCaptchaWithGemini(imageBuffer []byte, cfg *Config) (string, error) {
 // ============================================================================
 
 // sorgulaSite queries a domain on GIH
-func sorgulaSite(domain, captchaCode string, cookies map[string]string, cfg *Config) (string, error) {
+func sorgulaSite(domain, captchaCode string, cookies map[string]*http.Cookie, cfg *Config) (string, error) {
 	log("\n🔍 Sorgulanıyor: %s\n", domain)
 
 	// Build form data
