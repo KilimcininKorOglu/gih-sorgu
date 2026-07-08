@@ -1240,7 +1240,7 @@ func getCaptcha(cfg *Config, existingSession map[string]string) (*CaptchaResult,
 	}
 
 	// Set CAPTCHA-specific headers
-	req.Header.Set("Accept", "image/avif,image/webp,image/png,image/svg+xml,image/*;q=0.8,*/*;q=0.5")
+	req.Header.Set("Accept", "image/jpeg")
 	req.Header.Set("Accept-Encoding", "identity") // No compression for images
 	req.Header.Set("Sec-Fetch-Dest", "image")
 	req.Header.Set("Sec-Fetch-Mode", "no-cors")
