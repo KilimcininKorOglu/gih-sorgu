@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"compress/flate"
 	"compress/gzip"
+	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -30,10 +31,12 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 	"unicode"
 
@@ -1873,6 +1876,18 @@ func run() int {
 	log("📋 Sorgulanacak %d site: %s\n", len(validDomains), strings.Join(validDomains, ", "))
 	log("🤖 Model: %s\n\n", cfg.GeminiModel)
 
+	// Setup signal handling for graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sigChan)
+	defer cancel()
+
+	go func() {
+		<-sigChan
+		cancel()
+	}()
+
 	// Query domains
 	var results []*QueryResult
 	var sharedSession map[string]string
@@ -1881,6 +1896,15 @@ func run() int {
 	const maxConsecutiveGeminiFailures = 5
 
 	for i, domain := range validDomains {
+		select {
+		case <-ctx.Done():
+			if !jsonOutputMode {
+				fmt.Fprintf(os.Stderr, "\n⚠️ İptal edildi. %d/%d site tamamlandı.\n", i, len(validDomains))
+			}
+			return ExitSuccess
+		default:
+		}
+
 		var result *QueryResult
 		var queryDuration time.Duration
 		var lastErr error
