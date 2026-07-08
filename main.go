@@ -2198,8 +2198,11 @@ func run() int {
 
 		blocked := 0
 		accessible := 0
+		unknown := 0
 		for _, r := range results {
-			if r.EngelliMi {
+			if !r.Parsed {
+				unknown++
+			} else if r.EngelliMi {
 				blocked++
 			} else {
 				accessible++
@@ -2209,6 +2212,9 @@ func run() int {
 
 		fmt.Printf("   🚫 Engelli: %d\n", blocked)
 		fmt.Printf("   ✅ Erişilebilir: %d\n", accessible)
+		if unknown > 0 {
+			fmt.Printf("   ⚠️  Bilinmiyor: %d\n", unknown)
+		}
 		if failed > 0 {
 			fmt.Printf("   ❓ Hatalı: %d\n", failed)
 		}
