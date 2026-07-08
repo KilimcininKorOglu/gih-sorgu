@@ -22,6 +22,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -166,6 +167,15 @@ type GeminiError struct {
 		Message string `json:"message"`
 	} `json:"error"`
 }
+
+// RetryAfterError wraps an error with a server-indicated retry delay.
+type RetryAfterError struct {
+	Inner      error
+	RetryAfter time.Duration
+}
+
+func (e *RetryAfterError) Error() string { return e.Inner.Error() }
+func (e *RetryAfterError) Unwrap() error { return e.Inner }
 
 // JSON output types
 type JSONOutput struct {
@@ -557,7 +567,12 @@ func (m TUIModel) queryDomain(domain string) tea.Cmd {
 			if err != nil {
 				lastErr = err
 				if retry < MaxRetries-1 {
-					time.Sleep(RetryDelay)
+					delay := RetryDelay
+					var rae *RetryAfterError
+					if errors.As(err, &rae) {
+						delay = rae.RetryAfter
+					}
+					time.Sleep(delay)
 				}
 				continue
 			}
@@ -1263,7 +1278,13 @@ func solveCaptchaWithGemini(imageBuffer []byte, cfg *Config) (string, error) {
 
 		switch resp.StatusCode {
 		case 429:
-			return "", fmt.Errorf("Gemini API kota aşıldı: %s", geminiErr.Error.Message)
+			inner := fmt.Errorf("Gemini API kota aşıldı: %s", geminiErr.Error.Message)
+			if ra := resp.Header.Get("Retry-After"); ra != "" {
+				if secs, err := strconv.Atoi(ra); err == nil && secs > 0 {
+					return "", &RetryAfterError{Inner: inner, RetryAfter: time.Duration(secs) * time.Second}
+				}
+			}
+			return "", inner
 		case 401, 403:
 			return "", fmt.Errorf("Gemini API yetkilendirme hatası: %s", geminiErr.Error.Message)
 		default:
@@ -1826,8 +1847,13 @@ func run() int {
 					fmt.Fprintf(os.Stderr, "❌ CAPTCHA çözülemedi: %s\n", err)
 				}
 				if retry < MaxRetries-1 {
+					delay := RetryDelay
+					var rae *RetryAfterError
+					if errors.As(err, &rae) {
+						delay = rae.RetryAfter
+					}
 					log("🔄 Yeniden deneniyor (%d/%d)...\n", retry+1, MaxRetries)
-					time.Sleep(RetryDelay)
+					time.Sleep(delay)
 				}
 				continue
 			}
