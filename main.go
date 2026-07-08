@@ -1477,7 +1477,15 @@ func solveCaptchaWithGemini(imageBuffer []byte, cfg *Config) (string, error) {
 
 	if resp.StatusCode != 200 {
 		var geminiErr GeminiError
-		json.Unmarshal(body, &geminiErr)
+		if err := json.Unmarshal(body, &geminiErr); err != nil || geminiErr.Error.Message == "" {
+			if geminiErr.Error.Message == "" {
+				preview := string(body)
+				if len(preview) > 200 {
+					preview = preview[:200] + "..."
+				}
+				geminiErr.Error.Message = preview
+			}
+		}
 
 		switch resp.StatusCode {
 		case 429:
