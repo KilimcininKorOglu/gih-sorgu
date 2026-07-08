@@ -1624,6 +1624,12 @@ func sorgulaSite(domain, captchaCode string, cookies map[string]*http.Cookie, cf
 		return "", err
 	}
 
+	// Validate response format
+	contentType := resp.Header.Get("Content-Type")
+	if !strings.Contains(contentType, "text/html") {
+		return "", fmt.Errorf("beklenmeyik yanıt formatı: %s", contentType)
+	}
+
 	return string(body), nil
 }
 
