@@ -802,7 +802,8 @@ func (m TUIModel) View() string {
 				} else if item.Result != nil && item.Result.EngelliMi {
 					icon = "🚫"
 				}
-				s.WriteString(fmt.Sprintf("   %s %s\n", icon, item.Domain))
+				timeAgo := formatTimeAgo(item.Timestamp)
+				s.WriteString(fmt.Sprintf("   %s %s (%s)\n", icon, item.Domain, timeAgo))
 			}
 
 			// Show scroll down indicator
@@ -893,6 +894,28 @@ func profilDurum(status string) string {
 		return "Engelli"
 	}
 	return "Erişilebilir"
+}
+
+// formatTimeAgo returns a short Turkish relative time string.
+func formatTimeAgo(t time.Time) string {
+	if t.IsZero() {
+		return "?"
+	}
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return "şimdi"
+	case d < time.Hour:
+		return fmt.Sprintf("%d dk önce", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%d sa önce", int(d.Hours()))
+	case d < 30*24*time.Hour:
+		return fmt.Sprintf("%d gün önce", int(d.Hours()/24))
+	case d < 365*24*time.Hour:
+		return fmt.Sprintf("%d ay önce", int(d.Hours()/24/30))
+	default:
+		return fmt.Sprintf("%d yıl önce", int(d.Hours()/24/365))
+	}
 }
 
 // runTUI starts the TUI application

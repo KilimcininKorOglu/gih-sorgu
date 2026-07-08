@@ -303,6 +303,31 @@ func TestProfilDurum(t *testing.T) {
 	}
 }
 
+func TestFormatTimeAgo(t *testing.T) {
+	now := time.Now()
+	tests := []struct {
+		name string
+		t    time.Time
+		want string
+	}{
+		{"zero", time.Time{}, "?"},
+		{"now", now, "şimdi"},
+		{"minutes", now.Add(-5 * time.Minute), "5 dk önce"},
+		{"hours", now.Add(-2 * time.Hour), "2 sa önce"},
+		{"days", now.Add(-3 * 24 * time.Hour), "3 gün önce"},
+		{"months", now.Add(-60 * 24 * time.Hour), "2 ay önce"},
+		{"years", now.Add(-2 * 365 * 24 * time.Hour), "2 yıl önce"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := formatTimeAgo(tt.t); got != tt.want {
+				t.Fatalf("formatTimeAgo(%v) = %q, want %q", tt.t, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestParseCookies(t *testing.T) {
 	cookies := []*http.Cookie{
 		{Name: "session", Value: "abc123"},
