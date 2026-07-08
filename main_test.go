@@ -1,10 +1,15 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestIsValidDomain(t *testing.T) {
@@ -199,4 +204,157 @@ func TestIsCaptchaError(t *testing.T) {
 	if isCaptchaError(`<table id="tbl_sorgu"><tr><td>ok</td></tr></table>`) {
 		t.Fatalf("did not expect result table to be detected as CAPTCHA error")
 	}
+}
+
+func TestClamp(t *testing.T) {
+	tests := []struct {
+		name  string
+		value int
+		min   int
+		max   int
+		want  int
+	}{
+		{"within range", 5, 0, 10, 5},
+		{"below min", -5, 0, 10, 0},
+		{"above max", 15, 0, 10, 10},
+		{"at min", 0, 0, 10, 0},
+		{"at max", 10, 0, 10, 10},
+		{"negative range", -5, -10, 0, -5},
+		{"all equal", 5, 5, 5, 5},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := clamp(tt.value, tt.min, tt.max); got != tt.want {
+				t.Fatalf("clamp(%d, %d, %d) = %d, want %d", tt.value, tt.min, tt.max, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMinInt(t *testing.T) {
+	tests := []struct {
+		a, b, want int
+	}{
+		{5, 10, 5},
+		{10, 5, 5},
+		{-5, 5, -5},
+		{5, -5, -5},
+		{0, 0, 0},
+		{5, 5, 5},
+	}
+
+	for _, tt := range tests {
+		t.Run("", func(t *testing.T) {
+			if got := minInt(tt.a, tt.b); got != tt.want {
+				t.Fatalf("minInt(%d, %d) = %d, want %d", tt.a, tt.b, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFormatDuration(t *testing.T) {
+	tests := []struct {
+		d    time.Duration
+		want string
+	}{
+		{100 * time.Millisecond, "100ms"},
+		{1 * time.Second, "1.00s"},
+		{1500 * time.Millisecond, "1.50s"},
+		{5 * time.Second, "5.00s"},
+		{1 * time.Minute, "1m 0.0s"},
+		{90 * time.Second, "1m 30.0s"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			if got := formatDuration(tt.d); got != tt.want {
+				t.Fatalf("formatDuration(%v) = %q, want %q", tt.d, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestProfilDurum(t *testing.T) {
+	tests := []struct {
+		status string
+		want   string
+	}{
+		{"erisim", "Erişilebilir"},
+		{"engelli", "Engelli"},
+		{"bilinmiyor", "Erişilebilir"},
+		{"", "Erişilebilir"},
+		{"unknown", "Erişilebilir"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.status, func(t *testing.T) {
+			if got := profilDurum(tt.status); got != tt.want {
+				t.Fatalf("profilDurum(%q) = %q, want %q", tt.status, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseCookies(t *testing.T) {
+	cookies := []*http.Cookie{
+		{Name: "session", Value: "abc123"},
+		{Name: "user", Value: "john"},
+		{Name: "token", Value: "xyz"},
+	}
+
+	got := parseCookies(cookies)
+	if got["session"] != "abc123" {
+		t.Fatalf("session = %q, want abc123", got["session"])
+	}
+	if got["user"] != "john" {
+		t.Fatalf("user = %q, want john", got["user"])
+	}
+	if got["token"] != "xyz" {
+		t.Fatalf("token = %q, want xyz", got["token"])
+	}
+}
+
+func TestCookiesToString(t *testing.T) {
+	cookies := map[string]string{
+		"session": "abc123",
+		"user":    "john",
+	}
+
+	got := cookiesToString(cookies)
+	if !strings.Contains(got, "session=abc123") {
+		t.Fatalf("missing session cookie in %q", got)
+	}
+	if !strings.Contains(got, "user=john") {
+		t.Fatalf("missing user cookie in %q", got)
+	}
+}
+
+func TestDecompressResponse(t *testing.T) {
+	t.Run("gzip", func(t *testing.T) {
+		var buf bytes.Buffer
+		gz := gzip.NewWriter(&buf)
+		gz.Write([]byte("test data"))
+		gz.Close()
+
+		body := io.NopCloser(&buf)
+		got, err := decompressResponse(body, "gzip")
+		if err != nil {
+			t.Fatalf("decompressResponse error: %v", err)
+		}
+		if string(got) != "test data" {
+			t.Fatalf("got %q, want test data", string(got))
+		}
+	})
+
+	t.Run("identity", func(t *testing.T) {
+		body := io.NopCloser(bytes.NewReader([]byte("test data")))
+		got, err := decompressResponse(body, "")
+		if err != nil {
+			t.Fatalf("decompressResponse error: %v", err)
+		}
+		if string(got) != "test data" {
+			t.Fatalf("got %q, want test data", string(got))
+		}
+	})
 }
