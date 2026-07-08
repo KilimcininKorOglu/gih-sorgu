@@ -881,6 +881,10 @@ func (m TUIModel) renderResult() string {
 		content.WriteString("👶 Çocuk Profili: ✅ Erişilebilir\n")
 	}
 
+	if m.result.Mesaj != nil {
+		content.WriteString(fmt.Sprintf("\n💬 Mesaj: %s", *m.result.Mesaj))
+	}
+
 	return resultBoxStyle.Render(content.String())
 }
 
