@@ -1987,6 +1987,19 @@ Kaynak:
 `, Version)
 }
 
+// printAPIKeyHelp prints instructions for supplying a Gemini API key.
+func printAPIKeyHelp() {
+	fmt.Println()
+	fmt.Println("   Seçenek 1: .env dosyası oluşturun")
+	fmt.Println("   GEMINI_API_KEY=your_api_key")
+	fmt.Println()
+	fmt.Println("   Seçenek 2: Ortam değişkeni ayarlayın")
+	fmt.Println("   Windows: set GEMINI_API_KEY=your_api_key")
+	fmt.Println("   Linux/Mac: export GEMINI_API_KEY=your_api_key")
+	fmt.Println()
+	fmt.Println("   API anahtarı almak için: https://aistudio.google.com/app/apikey")
+}
+
 // ============================================================================
 // MAIN
 // ============================================================================
@@ -2032,15 +2045,7 @@ func run() int {
 		cfg, err := loadConfig()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ %s\n", err)
-			fmt.Println()
-			fmt.Println("   Seçenek 1: .env dosyası oluşturun")
-			fmt.Println("   GEMINI_API_KEY=your_api_key")
-			fmt.Println()
-			fmt.Println("   Seçenek 2: Ortam değişkeni ayarlayın")
-			fmt.Println("   Windows: set GEMINI_API_KEY=your_api_key")
-			fmt.Println("   Linux/Mac: export GEMINI_API_KEY=your_api_key")
-			fmt.Println()
-			fmt.Println("   API anahtarı almak için: https://aistudio.google.com/app/apikey")
+			printAPIKeyHelp()
 			fmt.Println()
 			fmt.Print("   Çıkmak için Enter'a basın...")
 			bufio.NewReader(os.Stdin).ReadBytes('\n')
@@ -2141,15 +2146,7 @@ func run() int {
 			outputJSONError(nil, err.Error(), ErrorCodeConfigError)
 		} else {
 			fmt.Fprintf(os.Stderr, "❌ %s\n", err)
-			fmt.Println()
-			fmt.Println("   Seçenek 1: .env dosyası oluşturun")
-			fmt.Println("   GEMINI_API_KEY=your_api_key")
-			fmt.Println()
-			fmt.Println("   Seçenek 2: Ortam değişkeni ayarlayın")
-			fmt.Println("   Windows: set GEMINI_API_KEY=your_api_key")
-			fmt.Println("   Linux/Mac: export GEMINI_API_KEY=your_api_key")
-			fmt.Println()
-			fmt.Println("   API anahtarı almak için: https://aistudio.google.com/app/apikey")
+			printAPIKeyHelp()
 		}
 		return ExitConfigError
 	}
