@@ -813,9 +813,7 @@ func (m TUIModel) View() string {
 			// Calculate visible range
 			end := len(m.history) - m.historyOffset
 			start := end - visibleCount
-			if start < 0 {
-				start = 0
-			}
+			start = max(start, 0)
 
 			for i := start; i < end; i++ {
 				item := m.history[i]
