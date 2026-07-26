@@ -2190,7 +2190,8 @@ func run() int {
 `)
 
 	log("📋 Sorgulanacak %d site: %s\n", len(validDomains), strings.Join(validDomains, ", "))
-	log("🤖 Model: %s\n\n", cfg.GeminiModel)
+	log("🤖 Model: %s | Max token: %d | Bekleme: %dms\n", cfg.GeminiModel, cfg.GeminiMaxTokens, cfg.RateLimitDelay)
+	log("🌐 User-Agent: %s\n\n", cfg.UserAgent)
 
 	// Setup signal handling for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
