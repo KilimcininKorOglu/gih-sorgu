@@ -1084,7 +1084,9 @@ func loadEnvFileAt(envPath string) error {
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
+	lineNum := 0
 	for scanner.Scan() {
+		lineNum++
 		line := strings.TrimSpace(scanner.Text())
 
 		// Skip empty lines and comments
@@ -1095,6 +1097,7 @@ func loadEnvFileAt(envPath string) error {
 		// Find first = sign
 		idx := strings.Index(line, "=")
 		if idx == -1 {
+			fmt.Fprintf(os.Stderr, "⚠️ .env %s:%d: '=' içermeyen satır atlandı\n", envPath, lineNum)
 			continue
 		}
 
@@ -1104,6 +1107,12 @@ func loadEnvFileAt(envPath string) error {
 		// Strip optional `export ` prefix commonly used in shell dotenv files
 		key = strings.TrimPrefix(key, "export ")
 		key = strings.TrimSpace(key)
+
+		// Skip lines with an empty key (e.g. "=value")
+		if key == "" {
+			fmt.Fprintf(os.Stderr, "⚠️ .env %s:%d: boş anahtarlı satır atlandı\n", envPath, lineNum)
+			continue
+		}
 
 		// Remove surrounding quotes
 		if len(value) >= 2 {
