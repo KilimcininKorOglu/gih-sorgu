@@ -617,14 +617,15 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			if m.state == stateInput && m.textInput.Value() != "" {
 				domain := strings.TrimSpace(m.textInput.Value())
-				if isValidDomain(domain) {
+				if err := validateDomain(domain); err != nil {
+					m.errorMsg = "Geçersiz domain: " + err.Error()
+					m.state = stateError
+				} else {
 					m.currentQuery = domain
 					m.state = stateQuerying
 					m.textInput.Blur()
 					return m, m.queryDomain(domain)
 				}
-				m.errorMsg = "Geçersiz domain formatı"
-				m.state = stateError
 				return m, nil
 			}
 			if m.state == stateResult || m.state == stateError {
@@ -1230,40 +1231,44 @@ func isASCIIDigit(r rune) bool {
 	return r >= '0' && r <= '9'
 }
 
-// isValidDomain checks if a domain name is valid
-func isValidDomain(domain string) bool {
-	if domain == "" {
-		return false
-	}
-
+// validateDomain checks a domain name and returns a specific error describing
+// which rule failed, or nil if the domain is valid.
+func validateDomain(domain string) error {
 	d := strings.ToLower(strings.TrimSpace(domain))
 
+	if d == "" {
+		return fmt.Errorf("domain boş olamaz")
+	}
+
 	// Length check: 1-253 characters
-	if len(d) == 0 || len(d) > 253 {
-		return false
+	if len(d) > 253 {
+		return fmt.Errorf("domain çok uzun (maksimum 253 karakter)")
 	}
 
 	// Must contain at least one dot
 	if !strings.Contains(d, ".") {
-		return false
+		return fmt.Errorf("domain en az bir nokta içermeli (örn. example.com)")
 	}
 
 	labels := strings.Split(d, ".")
 	for _, label := range labels {
 		// Each label: 1-63 characters
-		if len(label) == 0 || len(label) > 63 {
-			return false
+		if len(label) == 0 {
+			return fmt.Errorf("boş etiket (ardışık nokta veya baştaki/sondaki nokta)")
+		}
+		if len(label) > 63 {
+			return fmt.Errorf("etiket çok uzun (maksimum 63 karakter): %q", label)
 		}
 
 		// Cannot start or end with hyphen
 		if label[0] == '-' || label[len(label)-1] == '-' {
-			return false
+			return fmt.Errorf("etiket tire ile başlayamaz veya bitemez: %q", label)
 		}
 
 		// Only ASCII alphanumeric and hyphen allowed
 		for _, r := range label {
 			if !isASCIILetter(r) && !isASCIIDigit(r) && r != '-' {
-				return false
+				return fmt.Errorf("etiket geçersiz karakter içeriyor (%q): %q", r, label)
 			}
 		}
 	}
@@ -1271,19 +1276,24 @@ func isValidDomain(domain string) bool {
 	// TLD validation
 	tld := labels[len(labels)-1]
 	if len(tld) < 2 {
-		return false
+		return fmt.Errorf("TLD en az 2 karakter olmalı: %q", tld)
 	}
 
 	// TLD must be ASCII letters only (unless punycode xn--)
 	if !strings.HasPrefix(tld, "xn--") {
 		for _, r := range tld {
 			if !isASCIILetter(r) {
-				return false
+				return fmt.Errorf("TLD yalnızca ASCII harf içerebilir: %q", tld)
 			}
 		}
 	}
 
-	return true
+	return nil
+}
+
+// isValidDomain reports whether a domain name is valid.
+func isValidDomain(domain string) bool {
+	return validateDomain(domain) == nil
 }
 
 // ============================================================================
@@ -2126,11 +2136,11 @@ func run() int {
 	var validDomains []string
 	seenDomains := make(map[string]bool, len(args.Domains))
 	for _, d := range args.Domains {
-		if !isValidDomain(d) {
+		if verr := validateDomain(d); verr != nil {
 			if jsonOutputMode {
-				log("Geçersiz domain atlandı: %s\n", d)
+				log("Geçersiz domain atlandı (%s): %s\n", d, verr)
 			} else {
-				fmt.Fprintf(os.Stderr, "⚠️ Geçersiz domain atlandı: %s\n", d)
+				fmt.Fprintf(os.Stderr, "⚠️ Geçersiz domain atlandı (%s): %s\n", d, verr)
 			}
 			continue
 		}
