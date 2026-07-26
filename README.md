@@ -39,6 +39,19 @@ make build-all        # Linux/macOS
 build.bat build-all   # Windows
 ```
 
+#### Geliştirme Komutları
+
+| Komut               | Açıklama                          |
+|---------------------|-----------------------------------|
+| `make lint`         | `go fmt` + `go vet` çalıştırır     |
+| `make test`         | Tüm testleri çalıştırır           |
+| `make test-race`    | Testleri race detector ile koşar  |
+| `make test-cover`   | Test kapsamını ölçer              |
+| `make run`          | Derleyip TUI'yi başlatır          |
+| `make clean`        | Build çıktılarını temizler        |
+
+Windows'ta `build.bat <hedef>` kullanın (`build`, `build-all`, `lint`, `test`, `run`, `clean`).
+
 ### Gereksinimler
 
 - **Gemini API Key** - [Google AI Studio](https://aistudio.google.com/app/apikey) adresinden ücretsiz alınabilir
@@ -87,6 +100,9 @@ Argümansız çalıştırınca interaktif TUI açılır (Windows'ta exe'ye çift
 # Dosyadan liste oku
 ./gih-sorgu --liste sites.txt
 
+# Kesintiye uğrayan liste sorgusuna kaldığı yerden devam et
+./gih-sorgu --liste sites.txt --resume
+
 # JSON formatında çıktı
 ./gih-sorgu --json discord.com
 
@@ -94,6 +110,17 @@ Argümansız çalıştırınca interaktif TUI açılır (Windows'ta exe'ye çift
 ./gih-sorgu --help
 ./gih-sorgu --version
 ```
+
+### Toplu Sorgu ve Devam Etme
+
+`--liste` ile çoklu sorgu yapıldığında her başarılı sorgudan sonra ilerleme bir checkpoint dosyasına yazılır:
+
+- `--liste sites.txt` için `sites.txt.progress.json`
+- Argümanla verilen domainler için `gih-sorgu-progress.json`
+
+Sorgu `Ctrl+C` veya `SIGTERM` ile kesilirse temiz kapanır. `--resume` eklendiğinde daha önce tamamlanan domainler atlanır ve kalanlardan devam edilir. Checkpoint dosyası otomatik silinmez; yeni bir tam çalıştırma için elle silin.
+
+Gemini API art arda 5 kez başarısız olursa toplu sorgu güvenlik için durdurulur.
 
 ## Örnek Çıktı
 
@@ -131,6 +158,30 @@ Argümansız çalıştırınca interaktif TUI açılır (Windows'ta exe'ye çift
   "mesaj": "Bu alan adı aile ve çocuk profilinde görüntülenememektedir."
 }
 ```
+
+### JSON Hata Çıktısı (`--json`)
+
+Hata durumunda makine tarafından okunabilir bir hata nesnesi döner:
+
+```json
+{
+  "timestamp": "2024-12-06T12:00:00Z",
+  "status": false,
+  "domain": "discord.com",
+  "error": "Gemini API isteği başarısız",
+  "errorCode": "API_ERROR"
+}
+```
+
+| errorCode             | Anlam                        |
+|-----------------------|------------------------------|
+| `INVALID_ARGUMENTS`   | Geçersiz argüman veya domain |
+| `CONFIG_ERROR`        | Config hatası (API key eksik)|
+| `NETWORK_ERROR`       | Ağ hatası                    |
+| `API_ERROR`           | Gemini API hatası            |
+| `API_AUTH_ERROR`      | Gemini API kimlik doğrulama  |
+| `CAPTCHA_SOLVE_ERROR` | CAPTCHA çözülemedi            |
+| `GENERAL_ERROR`       | Sınıflandırılamayan hata     |
 
 ## Dosya Listesi Formatı
 
