@@ -243,7 +243,13 @@ type JSONErrorOutput struct {
 // ============================================================================
 
 var (
+	// jsonOutputMode selects machine-readable JSON output for query results.
 	jsonOutputMode bool
+
+	// logsToStderr routes diagnostic log() / logln() output to stderr instead
+	// of stdout. Enabled in JSON mode (keep stdout clean for JSON) and in TUI
+	// mode (avoid corrupting the Bubbletea alt-screen).
+	logsToStderr bool
 
 	// HTTP clients
 	secureClient   *http.Client
@@ -946,8 +952,8 @@ func formatTimeAgo(t time.Time) string {
 
 // runTUI starts the TUI application
 func runTUI(cfg *Config) error {
-	// Suppress logs in TUI mode
-	jsonOutputMode = true
+	// Route logs to stderr in TUI mode to avoid corrupting the alt-screen
+	logsToStderr = true
 
 	model := NewTUIModel(cfg)
 	p := tea.NewProgram(model, tea.WithAltScreen())
@@ -1008,18 +1014,18 @@ func init() {
 // LOGGING
 // ============================================================================
 
-// log prints message only in non-JSON mode
+// log prints a diagnostic message, routed to stderr when logsToStderr is set
 func log(format string, args ...interface{}) {
-	if jsonOutputMode {
+	if logsToStderr {
 		fmt.Fprintf(os.Stderr, format, args...)
 	} else {
 		fmt.Printf(format, args...)
 	}
 }
 
-// logln prints message with newline
+// logln prints a diagnostic message with newline, routed to stderr when logsToStderr is set
 func logln(msg string) {
-	if jsonOutputMode {
+	if logsToStderr {
 		fmt.Fprintln(os.Stderr, msg)
 	} else {
 		fmt.Println(msg)
@@ -2051,8 +2057,9 @@ func run() int {
 		return ExitSuccess
 	}
 
-	// Set JSON output mode
+	// Set JSON output mode; keep stdout clean for JSON by routing logs to stderr
 	jsonOutputMode = args.JSONOutput
+	logsToStderr = args.JSONOutput
 
 	// Load domains from file if specified
 	if args.ListFile != "" {
