@@ -488,9 +488,7 @@ func translateNetworkError(err error) string {
 // calculateRetryDelay returns exponential backoff with jitter for retry attempts.
 func calculateRetryDelay(retry int) time.Duration {
 	backoff := RetryDelay * time.Duration(1<<uint(retry))
-	if backoff > MaxRetryDelay {
-		backoff = MaxRetryDelay
-	}
+	backoff = min(backoff, MaxRetryDelay)
 	jitter := time.Duration(rand.Int63n(int64(backoff) / 5))
 	return backoff + jitter
 }
@@ -569,12 +567,8 @@ func NewTUIModel(cfg *Config) TUIModel {
 func (m TUIModel) getVisibleHistoryCount() int {
 	// Calculate available lines for history (screen height - header - input - help - margins)
 	available := m.height - 10
-	if available < 5 {
-		available = 5
-	}
-	if available > 15 {
-		available = 15
-	}
+	available = max(available, 5)
+	available = min(available, 15)
 	if available > len(m.history) {
 		return len(m.history)
 	}
@@ -714,7 +708,7 @@ func (m TUIModel) queryDomain(domain string) tea.Cmd {
 		startTime := time.Now()
 		var lastErr error
 
-		for retry := 0; retry < MaxRetries; retry++ {
+		for retry := range MaxRetries {
 			// Get CAPTCHA
 			captchaResult, err := getCaptcha(m.config, nil)
 			if err != nil {
@@ -809,7 +803,7 @@ func (m TUIModel) View() string {
 			if len(m.history) > visibleCount {
 				scrollInfo = fmt.Sprintf(" [%d/%d]", len(m.history)-m.historyOffset, len(m.history))
 			}
-			s.WriteString(fmt.Sprintf(" 📜 Geçmiş%s:\n", scrollInfo))
+			fmt.Fprintf(&s, " 📜 Geçmiş%s:\n", scrollInfo)
 
 			// Show scroll up indicator
 			if canScrollUp {
@@ -833,9 +827,9 @@ func (m TUIModel) View() string {
 				}
 				timeAgo := formatTimeAgo(item.Timestamp)
 				if item.Error == "" && item.duration > 0 {
-					s.WriteString(fmt.Sprintf("   %s %s (%s, %s)\n", icon, item.Domain, timeAgo, formatDuration(item.duration)))
+					fmt.Fprintf(&s, "   %s %s (%s, %s)\n", icon, item.Domain, timeAgo, formatDuration(item.duration))
 				} else {
-					s.WriteString(fmt.Sprintf("   %s %s (%s)\n", icon, item.Domain, timeAgo))
+					fmt.Fprintf(&s, "   %s %s (%s)\n", icon, item.Domain, timeAgo)
 				}
 			}
 
@@ -880,8 +874,8 @@ func (m TUIModel) renderResult() string {
 	var content strings.Builder
 
 	// Domain header
-	content.WriteString(fmt.Sprintf("📌 Domain: %s\n", m.result.Domain))
-	content.WriteString(fmt.Sprintf("⏱️  Süre: %s\n\n", formatDuration(m.duration)))
+	fmt.Fprintf(&content, "📌 Domain: %s\n", m.result.Domain)
+	fmt.Fprintf(&content, "⏱️  Süre: %s\n\n", formatDuration(m.duration))
 
 	// Status
 	if !m.result.Parsed {
@@ -896,16 +890,16 @@ func (m TUIModel) renderResult() string {
 		if m.result.AileProfili == "engelli" {
 			aileIcon = "❌"
 		}
-		content.WriteString(fmt.Sprintf("👨‍👩‍👧 Aile Profili: %s %s\n", aileIcon, profilDurum(m.result.AileProfili)))
+		fmt.Fprintf(&content, "👨‍👩‍👧 Aile Profili: %s %s\n", aileIcon, profilDurum(m.result.AileProfili))
 
 		cocukIcon := "✅"
 		if m.result.CocukProfili == "engelli" {
 			cocukIcon = "❌"
 		}
-		content.WriteString(fmt.Sprintf("👶 Çocuk Profili: %s %s\n", cocukIcon, profilDurum(m.result.CocukProfili)))
+		fmt.Fprintf(&content, "👶 Çocuk Profili: %s %s\n", cocukIcon, profilDurum(m.result.CocukProfili))
 
 		if m.result.EngelTarihi != nil {
-			content.WriteString(fmt.Sprintf("\n📅 Engel Tarihi: %s", *m.result.EngelTarihi))
+			fmt.Fprintf(&content, "\n📅 Engel Tarihi: %s", *m.result.EngelTarihi)
 		}
 	} else {
 		content.WriteString(accessibleStyle.Render("✅ Durum: ERİŞİLEBİLİR"))
@@ -916,7 +910,7 @@ func (m TUIModel) renderResult() string {
 	}
 
 	if m.result.Mesaj != nil {
-		content.WriteString(fmt.Sprintf("\n💬 Mesaj: %s", *m.result.Mesaj))
+		fmt.Fprintf(&content, "\n💬 Mesaj: %s", *m.result.Mesaj)
 	}
 
 	return resultBoxStyle.Render(content.String())
@@ -1023,7 +1017,7 @@ func init() {
 // ============================================================================
 
 // log prints a diagnostic message, routed to stderr when logsToStderr is set
-func log(format string, args ...interface{}) {
+func log(format string, args ...any) {
 	if logsToStderr {
 		fmt.Fprintf(os.Stderr, format, args...)
 	} else {
@@ -1106,15 +1100,15 @@ func loadEnvFileAt(envPath string) error {
 			continue
 		}
 
-		// Find first = sign
-		idx := strings.Index(line, "=")
-		if idx == -1 {
+		// Split on the first = sign
+		rawKey, rawValue, found := strings.Cut(line, "=")
+		if !found {
 			fmt.Fprintf(os.Stderr, "⚠️ .env %s:%d: '=' içermeyen satır atlandı\n", envPath, lineNum)
 			continue
 		}
 
-		key := strings.TrimSpace(line[:idx])
-		value := strings.TrimSpace(line[idx+1:])
+		key := strings.TrimSpace(rawKey)
+		value := strings.TrimSpace(rawValue)
 
 		// Strip optional `export ` prefix commonly used in shell dotenv files
 		key = strings.TrimPrefix(key, "export ")
@@ -2252,7 +2246,7 @@ func run() int {
 		var lastErr error
 		startTime := time.Now()
 
-		for retry := 0; retry < MaxRetries; retry++ {
+		for retry := range MaxRetries {
 			// Get CAPTCHA
 			captchaResult, err := getCaptcha(cfg, sharedSession)
 			if err != nil {
