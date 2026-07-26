@@ -1,5 +1,5 @@
 /**
- * Güvenli İnternet Hizmeti (GİH) Sorgu Tool
+ * Güvenli İnternet Hizmeti (GİH) Query Tool
  * ==================================================
  * Queries domain blocking status on Turkey's Safe Internet Service.
  * Uses Gemini API for automatic CAPTCHA solving.
@@ -972,7 +972,7 @@ func init() {
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 10 {
-				return fmt.Errorf("too many redirects")
+				return fmt.Errorf("çok fazla yönlendirme")
 			}
 			// Strip x-goog-api-key on cross-domain redirects
 			if len(via) > 0 && req.URL.Host != via[len(via)-1].URL.Host {
@@ -995,7 +995,7 @@ func init() {
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 5 {
-				return fmt.Errorf("too many redirects")
+				return fmt.Errorf("çok fazla yönlendirme")
 			}
 			// Preserve cookies across redirects only for same host
 			if len(via) > 0 && req.URL.Host == via[len(via)-1].URL.Host {
@@ -1203,7 +1203,7 @@ func loadConfig() (*Config, error) {
 
 	// Validation
 	if cfg.GeminiAPIKey == "" {
-		return nil, fmt.Errorf("GEMINI_API_KEY is required")
+		return nil, fmt.Errorf("GEMINI_API_KEY gerekli")
 	}
 
 	return cfg, nil
@@ -2066,7 +2066,7 @@ func run() int {
 	if args.ShowVersion {
 		fmt.Printf("Güvenli İnternet Sorgu Aracı v%s (%s)\n", Version, BuildCommit)
 		if BuildTime != "unknown" {
-			fmt.Printf("Build: %s\n", BuildTime)
+			fmt.Printf("Derleme: %s\n", BuildTime)
 		}
 		return ExitSuccess
 	}
