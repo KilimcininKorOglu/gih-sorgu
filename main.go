@@ -2187,6 +2187,10 @@ func run() int {
 		default:
 		}
 
+		if len(validDomains) > 1 {
+			log("\n[%d/%d] %s\n", i+1, len(validDomains), domain)
+		}
+
 		var result *QueryResult
 		var queryDuration time.Duration
 		var lastErr error
