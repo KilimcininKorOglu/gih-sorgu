@@ -1917,7 +1917,13 @@ func parseArgs() *CLIArgs {
 func loadDomainsFromFile(filename string) ([]string, error) {
 	file, err := os.Open(filename)
 	if err != nil {
-		return nil, fmt.Errorf("dosya bulunamadı: %s", filename)
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("dosya bulunamadı: %s", filename)
+		}
+		if os.IsPermission(err) {
+			return nil, fmt.Errorf("dosya okunamadı (izin reddedildi): %s", filename)
+		}
+		return nil, fmt.Errorf("dosya açılamadı %s: %w", filename, err)
 	}
 	defer file.Close()
 
