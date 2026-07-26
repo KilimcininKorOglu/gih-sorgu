@@ -530,7 +530,6 @@ type TUIModel struct {
 	history       []HistoryItem
 	historyOffset int // Scroll offset for history view
 	tabIndex      int // Current tab cycle index (-1 = not cycling)
-	width         int
 	height        int
 	quitting      bool
 }
@@ -562,7 +561,6 @@ func NewTUIModel(cfg *Config) TUIModel {
 		history:       history,
 		historyOffset: 0,
 		tabIndex:      -1,
-		width:         80,
 		height:        24,
 	}
 }
@@ -667,7 +665,6 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
 		m.height = msg.Height
 
 	case QueryMsg:
