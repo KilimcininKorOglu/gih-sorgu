@@ -1441,7 +1441,10 @@ func getCaptcha(cfg *Config, existingSession *SessionCache) (*CaptchaResult, err
 	if err != nil {
 		return nil, fmt.Errorf("CAPTCHA indirme başarısız: %s", translateNetworkError(err))
 	}
-	defer resp.Body.Close()
+	defer func() {
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+	}()
 
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("CAPTCHA indirme başarısız: HTTP %d", resp.StatusCode)
@@ -1631,7 +1634,10 @@ func sorgulaSite(domain, captchaCode string, cookies map[string]*http.Cookie, cf
 	if err != nil {
 		return "", fmt.Errorf("sorgu başarısız: %s", translateNetworkError(err))
 	}
-	defer resp.Body.Close()
+	defer func() {
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+	}()
 
 	if resp.StatusCode != 200 {
 		return "", fmt.Errorf("sorgu başarısız: HTTP %d", resp.StatusCode)
