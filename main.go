@@ -831,7 +831,11 @@ func (m TUIModel) View() string {
 					icon = "🚫"
 				}
 				timeAgo := formatTimeAgo(item.Timestamp)
-				s.WriteString(fmt.Sprintf("   %s %s (%s)\n", icon, item.Domain, timeAgo))
+				if item.Error == "" && item.duration > 0 {
+					s.WriteString(fmt.Sprintf("   %s %s (%s, %s)\n", icon, item.Domain, timeAgo, formatDuration(item.duration)))
+				} else {
+					s.WriteString(fmt.Sprintf("   %s %s (%s)\n", icon, item.Domain, timeAgo))
+				}
 			}
 
 			// Show scroll down indicator
