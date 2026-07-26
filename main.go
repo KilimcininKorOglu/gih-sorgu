@@ -2075,18 +2075,24 @@ func run() int {
 		args.Domains = append(args.Domains, fileDomains...)
 	}
 
-	// Validate domains
+	// Validate domains, skipping duplicates (case-insensitive)
 	var validDomains []string
+	seenDomains := make(map[string]bool, len(args.Domains))
 	for _, d := range args.Domains {
-		if isValidDomain(d) {
-			validDomains = append(validDomains, d)
-		} else {
+		if !isValidDomain(d) {
 			if jsonOutputMode {
 				log("Geçersiz domain atlandı: %s\n", d)
 			} else {
 				fmt.Fprintf(os.Stderr, "⚠️ Geçersiz domain atlandı: %s\n", d)
 			}
+			continue
 		}
+		key := strings.ToLower(strings.TrimSpace(d))
+		if seenDomains[key] {
+			continue
+		}
+		seenDomains[key] = true
+		validDomains = append(validDomains, d)
 	}
 
 	if len(validDomains) == 0 {
