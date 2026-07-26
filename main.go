@@ -2006,6 +2006,7 @@ Ortam Değişkenleri (.env dosyası veya sistem ortamı):
   GEMINI_MODEL        Gemini model adı (varsayılan: gemini-2.5-flash)
   GEMINI_MAX_TOKENS   Maksimum token sayısı (varsayılan: 256)
   RATE_LIMIT_DELAY    Sorgular arası bekleme ms (varsayılan: 500)
+  USER_AGENT          HTTP istekleri için User-Agent (varsayılan: Firefox)
 
 .env Dosyası Örneği:
   GEMINI_API_KEY=AIzaSy...your_api_key_here
