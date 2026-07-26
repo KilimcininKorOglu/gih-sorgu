@@ -78,6 +78,22 @@ goto %~1
     go test ./...
     goto end
 
+:test-race
+    go test -race ./...
+    goto end
+
+:test-cover
+    go test -cover ./...
+    goto end
+
+:test-verbose
+    go test -v ./...
+    goto end
+
+:bench
+    go test -bench=. -benchmem ./...
+    goto end
+
 :fmt
     go fmt ./...
     goto end
@@ -102,6 +118,10 @@ goto %~1
     echo   build-all   - Cross-compile for all platforms (dist\)
     echo   clean       - Remove build artifacts
     echo   test        - Run all tests
+    echo   test-race   - Run tests with race detector
+    echo   test-cover  - Run tests with coverage
+    echo   test-verbose - Run tests verbosely
+    echo   bench       - Run benchmarks
     echo   fmt         - Format code
     echo   vet         - Run go vet
     echo   lint        - Run fmt and vet
