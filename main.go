@@ -1443,13 +1443,14 @@ func getCaptcha(cfg *Config, existingSession *SessionCache) (*CaptchaResult, err
 		return nil, err
 	}
 
-	// Set CAPTCHA-specific headers
+	// Establish the shared browser fingerprint, then override the
+	// image-specific headers so all GIH requests share a consistent baseline
+	// (Accept-Language, Sec-Fetch-Site, DNT, etc.).
+	setDefaultHeaders(req, cfg)
 	req.Header.Set("Accept", "image/jpeg")
 	req.Header.Set("Accept-Encoding", "identity") // No compression for images
 	req.Header.Set("Sec-Fetch-Dest", "image")
 	req.Header.Set("Sec-Fetch-Mode", "no-cors")
-	req.Header.Set("User-Agent", cfg.UserAgent)
-	req.Header.Set("Referer", BaseURL+RefererPath)
 
 	// Add cookies (CRITICAL: don't add empty Cookie header)
 	cookieStr := cookiesToString(session.Cookies)
