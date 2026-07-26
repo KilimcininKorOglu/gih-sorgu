@@ -1354,7 +1354,7 @@ func mergeCookies(existing, incoming map[string]*http.Cookie) map[string]*http.C
 func setDefaultHeaders(req *http.Request, cfg *Config) {
 	req.Header.Set("User-Agent", cfg.UserAgent)
 	req.Header.Set("Accept", "*/*")
-	req.Header.Set("Accept-Language", "en-US,en;q=0.5")
+	req.Header.Set("Accept-Language", "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7")
 	req.Header.Set("Accept-Encoding", "gzip, deflate") // No brotli in stdlib
 	req.Header.Set("Origin", BaseURL)
 	req.Header.Set("Referer", BaseURL+RefererPath)
