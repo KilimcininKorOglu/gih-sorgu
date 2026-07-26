@@ -1089,6 +1089,10 @@ func loadEnvFileAt(envPath string) error {
 	}
 	defer file.Close()
 
+	// Report the loaded file to stderr (safe in both JSON and TUI modes,
+	// since this runs before any stdout/alt-screen output).
+	fmt.Fprintf(os.Stderr, "📄 .env yüklendi: %s\n", envPath)
+
 	scanner := bufio.NewScanner(file)
 	lineNum := 0
 	for scanner.Scan() {
