@@ -1,8 +1,10 @@
 @echo off
 setlocal enabledelayedexpansion
+:: Use UTF-8 code page so Turkish output renders correctly
+chcp 65001 >nul
 
 echo ========================================
-echo   GiH Sorgu - Build Script
+echo   GiH Sorgu - Derleme Betiği
 echo ========================================
 echo.
 
@@ -22,9 +24,9 @@ if not defined COMMIT set COMMIT=local
 for /f "tokens=*" %%i in ('powershell -command "Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ' -AsUTC"') do set BUILD_TIME=%%i
 if not defined BUILD_TIME set BUILD_TIME=unknown
 
-echo Version: %VERSION%
+echo Sürüm: %VERSION%
 echo Commit: %COMMIT%
-echo Build Time: %BUILD_TIME%
+echo Derleme Zamanı: %BUILD_TIME%
 echo.
 
 set LDFLAGS=-s -w -X main.Version=%VERSION% -X main.BuildCommit=%COMMIT% -X main.BuildTime=%BUILD_TIME%
@@ -38,7 +40,7 @@ goto %~1
 
 :build-all
     if not exist dist mkdir dist
-    echo Building for all platforms...
+    echo Tüm platformlar için derleniyor...
     echo.
 
     echo [1/6] Windows AMD64...
@@ -61,10 +63,10 @@ goto %~1
 
     echo.
     echo ========================================
-    echo   Build completed!
+    echo   Derleme tamamlandı!
     echo ========================================
     echo.
-    echo Output files:
+    echo Çıktı dosyaları:
     dir /b dist\
     goto end
 
@@ -113,19 +115,19 @@ goto %~1
     goto end
 
 :help
-    echo Available commands:
-    echo   build       - Build binary for current platform
-    echo   build-all   - Cross-compile for all platforms (dist\)
-    echo   clean       - Remove build artifacts
-    echo   test        - Run all tests
-    echo   test-race   - Run tests with race detector
-    echo   test-cover  - Run tests with coverage
-    echo   test-verbose - Run tests verbosely
-    echo   bench       - Run benchmarks
-    echo   fmt         - Format code
-    echo   vet         - Run go vet
-    echo   lint        - Run fmt and vet
-    echo   run         - Build and run
+    echo Kullanılabilir komutlar:
+    echo   build       - Geçerli platform için ikili dosya derle
+    echo   build-all   - Tüm platformlar için çapraz derle (dist\)
+    echo   clean       - Derleme çıktılarını temizle
+    echo   test        - Tüm testleri çalıştır
+    echo   test-race   - Testleri race dedektörü ile çalıştır
+    echo   test-cover  - Testleri kapsam ölçümüyle çalıştır
+    echo   test-verbose - Testleri ayrıntılı çalıştır
+    echo   bench       - Benchmark'ları çalıştır
+    echo   fmt         - Kodu biçimlendir
+    echo   vet         - go vet çalıştır
+    echo   lint        - fmt ve vet çalıştır
+    echo   run         - Derle ve çalıştır
     goto end
 
 :end
