@@ -1842,7 +1842,11 @@ func outputJSON(result *QueryResult, duration time.Duration) {
 		EngelTarihi:            result.EngelTarihi,
 	}
 
-	jsonBytes, _ := json.MarshalIndent(output, "", "  ")
+	jsonBytes, err := json.MarshalIndent(output, "", "  ")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "❌ JSON çıktısı oluşturulamadı: %s\n", err)
+		return
+	}
 	fmt.Println(string(jsonBytes))
 }
 
@@ -1897,7 +1901,11 @@ func outputJSONError(domain *string, message string, errorCode string) {
 		ErrorCode: errorCode,
 	}
 
-	jsonBytes, _ := json.MarshalIndent(output, "", "  ")
+	jsonBytes, err := json.MarshalIndent(output, "", "  ")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "❌ JSON hata çıktısı oluşturulamadı: %s\n", err)
+		return
+	}
 	fmt.Println(string(jsonBytes))
 }
 
