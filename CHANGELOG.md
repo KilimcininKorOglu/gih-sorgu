@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.2] - 2026-07-27
+
+### Changed
+- Raise the Go build floor to 1.25.12 to clear called standard-library CVEs and track it from go.mod in the release workflow
+- Annotate accepted gosec findings and Gemini error strings in place instead of altering behavior, and handle remaining unchecked error returns
+
 ## [1.1.1] - 2026-07-26
 
 ### Added
