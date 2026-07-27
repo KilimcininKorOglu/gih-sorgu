@@ -405,12 +405,12 @@ func saveHistory(items []HistoryItem) error {
 		if err != nil {
 			logln("⚠️ Backup oluşturulamadı")
 		} else {
-			defer src.Close()
+			defer func() { _ = src.Close() }()
 			dst, err := os.Create(backupFile)
 			if err != nil {
 				logln("⚠️ Backup oluşturulamadı")
 			} else {
-				defer dst.Close()
+				defer func() { _ = dst.Close() }()
 				if _, err := io.Copy(dst, src); err != nil {
 					logln("⚠️ Backup oluşturulamadı")
 				}
@@ -427,7 +427,7 @@ func saveHistory(items []HistoryItem) error {
 
 // loadBatchProgress reads the checkpoint file for batch resume
 func loadBatchProgress(filename string) (*BatchProgress, error) {
-	data, err := os.ReadFile(filename)
+	data, err := os.ReadFile(filename) // #nosec G304 -- user-supplied checkpoint path is expected CLI input
 	if err != nil {
 		return nil, err
 	}
@@ -489,7 +489,7 @@ func translateNetworkError(err error) string {
 func calculateRetryDelay(retry int) time.Duration {
 	backoff := RetryDelay * time.Duration(1<<uint(retry))
 	backoff = min(backoff, MaxRetryDelay)
-	jitter := time.Duration(rand.Int63n(int64(backoff) / 5))
+	jitter := time.Duration(rand.Int63n(int64(backoff) / 5)) // #nosec G404 -- retry backoff jitter, not security-sensitive
 	return backoff + jitter
 }
 
@@ -990,7 +990,10 @@ func init() {
 			TLSHandshakeTimeout:   10 * time.Second,
 			ResponseHeaderTimeout: 10 * time.Second,
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
+				// Intentional: guvenlinet.org.tr serves an incomplete certificate
+				// chain that fails standard verification. This client is used ONLY
+				// for that host; Gemini traffic uses the separate secureClient.
+				InsecureSkipVerify: true, // #nosec G402 -- deliberate, host-specific insecure client
 			},
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
@@ -1074,14 +1077,14 @@ func formatDuration(d time.Duration) string {
 
 // loadEnvFile loads environment variables from .env file
 func loadEnvFileAt(envPath string) error {
-	file, err := os.Open(envPath)
+	file, err := os.Open(envPath) // #nosec G304 -- user-supplied .env path is expected CLI input
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil // Silent fail if .env doesn't exist
 		}
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Report the loaded file to stderr (safe in both JSON and TUI modes,
 	// since this runs before any stdout/alt-screen output).
@@ -1128,7 +1131,7 @@ func loadEnvFileAt(envPath string) error {
 
 		// Only set if not already defined (system env takes precedence)
 		if os.Getenv(key) == "" {
-			os.Setenv(key, value)
+			_ = os.Setenv(key, value)
 		}
 	}
 
@@ -1371,7 +1374,7 @@ func setDefaultHeaders(req *http.Request, cfg *Config) {
 
 // decompressResponse decompresses response body based on encoding
 func decompressResponse(body io.ReadCloser, encoding string) ([]byte, error) {
-	defer body.Close()
+	defer func() { _ = body.Close() }()
 
 	switch strings.ToLower(encoding) {
 	case "gzip":
@@ -1379,11 +1382,11 @@ func decompressResponse(body io.ReadCloser, encoding string) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer reader.Close()
+		defer func() { _ = reader.Close() }()
 		return io.ReadAll(reader)
 	case "deflate":
 		reader := flate.NewReader(io.LimitReader(body, MaxHTMLBodySize))
-		defer reader.Close()
+		defer func() { _ = reader.Close() }()
 		return io.ReadAll(reader)
 	default:
 		return io.ReadAll(io.LimitReader(body, MaxHTMLBodySize))
@@ -1409,8 +1412,8 @@ func getSessionCookies(cfg *Config) (map[string]*http.Cookie, error) {
 		return nil, fmt.Errorf("oturum isteği başarısız: %s", translateNetworkError(err))
 	}
 	defer func() {
-		io.Copy(io.Discard, resp.Body)
-		resp.Body.Close()
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
 	}()
 
 	if resp.StatusCode != 200 {
@@ -1436,7 +1439,7 @@ func getCaptcha(cfg *Config, existingSession *SessionCache) (*CaptchaResult, err
 	}
 
 	// Build URL with random parameter
-	captchaURL := fmt.Sprintf("%s%s?rnd=%f", BaseURL, CaptchaPath, rand.Float64())
+	captchaURL := fmt.Sprintf("%s%s?rnd=%f", BaseURL, CaptchaPath, rand.Float64()) // #nosec G404 -- cache-buster query param, not security-sensitive
 
 	logln("📥 CAPTCHA indiriliyor...")
 
@@ -1465,8 +1468,8 @@ func getCaptcha(cfg *Config, existingSession *SessionCache) (*CaptchaResult, err
 		return nil, fmt.Errorf("CAPTCHA indirme başarısız: %s", translateNetworkError(err))
 	}
 	defer func() {
-		io.Copy(io.Discard, resp.Body)
-		resp.Body.Close()
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
 	}()
 
 	if resp.StatusCode != 200 {
@@ -1550,9 +1553,9 @@ func solveCaptchaWithGemini(imageBuffer []byte, cfg *Config) (string, error) {
 
 	resp, err := secureClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("Gemini API isteği başarısız: %s", translateNetworkError(err))
+		return "", fmt.Errorf("Gemini API isteği başarısız: %s", translateNetworkError(err)) //nolint:staticcheck // ST1005: starts with proper noun "Gemini"
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, MaxGeminiBodySize))
 
@@ -1570,7 +1573,7 @@ func solveCaptchaWithGemini(imageBuffer []byte, cfg *Config) (string, error) {
 
 		switch resp.StatusCode {
 		case 429:
-			inner := fmt.Errorf("Gemini API kota aşıldı: HTTP %d [%s]: %s", resp.StatusCode, geminiErr.Error.Status, geminiErr.Error.Message)
+			inner := fmt.Errorf("Gemini API kota aşıldı: HTTP %d [%s]: %s", resp.StatusCode, geminiErr.Error.Status, geminiErr.Error.Message) //nolint:staticcheck // ST1005: starts with proper noun "Gemini"
 			if ra := resp.Header.Get("Retry-After"); ra != "" {
 				if secs, err := strconv.Atoi(ra); err == nil && secs > 0 {
 					return "", &RetryAfterError{Inner: inner, RetryAfter: time.Duration(secs) * time.Second}
@@ -1578,34 +1581,34 @@ func solveCaptchaWithGemini(imageBuffer []byte, cfg *Config) (string, error) {
 			}
 			return "", inner
 		case 401, 403:
-			return "", fmt.Errorf("Gemini API yetkilendirme hatası: HTTP %d [%s]: %s", resp.StatusCode, geminiErr.Error.Status, geminiErr.Error.Message)
+			return "", fmt.Errorf("Gemini API yetkilendirme hatası: HTTP %d [%s]: %s", resp.StatusCode, geminiErr.Error.Status, geminiErr.Error.Message) //nolint:staticcheck // ST1005: starts with proper noun "Gemini"
 		default:
-			return "", fmt.Errorf("Gemini API hatası: HTTP %d [%s]: %s", resp.StatusCode, geminiErr.Error.Status, geminiErr.Error.Message)
+			return "", fmt.Errorf("Gemini API hatası: HTTP %d [%s]: %s", resp.StatusCode, geminiErr.Error.Status, geminiErr.Error.Message) //nolint:staticcheck // ST1005: starts with proper noun "Gemini"
 		}
 	}
 
 	var geminiResp GeminiResponse
 	if err := json.Unmarshal(body, &geminiResp); err != nil {
-		return "", fmt.Errorf("Gemini yanıtı ayrıştırılamadı: %w", err)
+		return "", fmt.Errorf("Gemini yanıtı ayrıştırılamadı: %w", err) //nolint:staticcheck // ST1005: starts with proper noun "Gemini"
 	}
 
 	// Check for safety filter
 	if geminiResp.PromptFeedback != nil && geminiResp.PromptFeedback.BlockReason != "" {
-		return "", fmt.Errorf("Gemini güvenlik filtresi: %s", geminiResp.PromptFeedback.BlockReason)
+		return "", fmt.Errorf("Gemini güvenlik filtresi: %s", geminiResp.PromptFeedback.BlockReason) //nolint:staticcheck // ST1005: starts with proper noun "Gemini"
 	}
 
 	// Extract text
 	if len(geminiResp.Candidates) == 0 {
-		return "", fmt.Errorf("Gemini API boş yanıt döndü")
+		return "", fmt.Errorf("Gemini API boş yanıt döndü") //nolint:staticcheck // ST1005: starts with proper noun "Gemini"
 	}
 
 	candidate := geminiResp.Candidates[0]
 	if candidate.FinishReason != "" && candidate.FinishReason != "STOP" {
-		return "", fmt.Errorf("Gemini yanıt tamamlanamadı: %s", candidate.FinishReason)
+		return "", fmt.Errorf("Gemini yanıt tamamlanamadı: %s", candidate.FinishReason) //nolint:staticcheck // ST1005: starts with proper noun "Gemini"
 	}
 
 	if len(candidate.Content.Parts) == 0 || candidate.Content.Parts[0].Text == "" {
-		return "", fmt.Errorf("Gemini API metin yanıtı vermedi")
+		return "", fmt.Errorf("Gemini API metin yanıtı vermedi") //nolint:staticcheck // ST1005: starts with proper noun "Gemini"
 	}
 
 	// Clean CAPTCHA code - only alphanumeric, preserve original case
@@ -1658,8 +1661,8 @@ func sorgulaSite(domain, captchaCode string, cookies map[string]*http.Cookie, cf
 		return "", fmt.Errorf("sorgu başarısız: %s", translateNetworkError(err))
 	}
 	defer func() {
-		io.Copy(io.Discard, resp.Body)
-		resp.Body.Close()
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
 	}()
 
 	if resp.StatusCode != 200 {
@@ -1952,7 +1955,7 @@ func parseArgs() *CLIArgs {
 
 // loadDomainsFromFile reads domains from a file
 func loadDomainsFromFile(filename string) ([]string, error) {
-	file, err := os.Open(filename)
+	file, err := os.Open(filename) // #nosec G304 -- user-supplied domain list path is expected CLI input
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("dosya bulunamadı: %s", filename)
@@ -1962,7 +1965,7 @@ func loadDomainsFromFile(filename string) ([]string, error) {
 		}
 		return nil, fmt.Errorf("dosya açılamadı %s: %w", filename, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var domains []string
 	scanner := bufio.NewScanner(file)
@@ -2092,7 +2095,7 @@ func run() int {
 			printAPIKeyHelp()
 			fmt.Println()
 			fmt.Print("   Çıkmak için Enter'a basın...")
-			bufio.NewReader(os.Stdin).ReadBytes('\n')
+			_, _ = bufio.NewReader(os.Stdin).ReadBytes('\n')
 			return ExitConfigError
 		}
 
@@ -2100,7 +2103,7 @@ func run() int {
 			fmt.Fprintf(os.Stderr, "❌ TUI hatası: %s\n", err)
 			fmt.Println()
 			fmt.Print("Çıkmak için Enter'a basın...")
-			bufio.NewReader(os.Stdin).ReadBytes('\n')
+			_, _ = bufio.NewReader(os.Stdin).ReadBytes('\n')
 			return ExitGeneralError
 		}
 		return ExitSuccess

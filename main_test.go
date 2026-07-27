@@ -430,8 +430,8 @@ func TestDecompressResponse(t *testing.T) {
 	t.Run("gzip", func(t *testing.T) {
 		var buf bytes.Buffer
 		gz := gzip.NewWriter(&buf)
-		gz.Write([]byte("test data"))
-		gz.Close()
+		_, _ = gz.Write([]byte("test data"))
+		_ = gz.Close()
 
 		body := io.NopCloser(&buf)
 		got, err := decompressResponse(body, "gzip")
@@ -466,7 +466,7 @@ func TestOutputJSONError(t *testing.T) {
 	domain := "example.com"
 	outputJSONError(&domain, "test error", ErrorCodeNetworkError)
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = oldStdout
 
 	out, err := io.ReadAll(r)
